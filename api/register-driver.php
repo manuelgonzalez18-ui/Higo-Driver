@@ -33,9 +33,9 @@ $termsVersionExpected = '2026-05-19';
 $privacyVersionExpected = '2026-05-19';
 
 $fullName = trim((string) ($_POST['full_name'] ?? ''));
-$cedula = strtoupper(trim((string) ($_POST['cedula'] ?? '')));
+$cedula = strtoupper(trim((string) ($_POST['cedula'] ?? ''));
 $phone = trim((string) ($_POST['phone'] ?? ''));
-$email = strtolower(trim((string) ($_POST['email'] ?? '')));
+$email = strtolower(trim((string) ($_POST['email'] ?? ''));
 $city = trim((string) ($_POST['city'] ?? ''));
 $vehicleType = trim((string) ($_POST['vehicle_type'] ?? ''));
 $vehicleBrand = trim((string) ($_POST['vehicle_brand'] ?? ''));
@@ -106,6 +106,9 @@ if ($smtpCfg === null) rd_send(503, ['ok' => false, 'error' => 'mail_config_miss
 foreach (['host', 'port', 'username', 'password', 'from_email'] as $key) {
     if (empty($smtpCfg[$key])) rd_send(503, ['ok' => false, 'error' => 'mail_config_invalid']);
 }
+if (empty($smtpCfg['higo_app_ingest_secret'])) {
+    rd_send(503, ['ok' => false, 'error' => 'admin_integration_not_configured']);
+}
 
 $idempotencyHash = hash('sha256', strtolower($idempotencyKey));
 $emailHash = hd_hash_email($email);
@@ -158,8 +161,38 @@ $stored = hd_json_mutate('driver-applications.json', function (array $store) use
 if ($stored === null) rd_send(500, ['ok' => false, 'error' => 'storage_failed']);
 if ($existingId !== null) {
     $applicationId = $existingId;
+}
+
+$syncPayload = [
+    'application_code' => $applicationId,
+    'idempotency_hash' => $idempotencyHash,
+    'full_name' => $fullName,
+    'cedula' => $cedula,
+    'phone' => $phone,
+    'phone_digits' => $phoneDigits,
+    'email' => $email,
+    'email_hash' => $emailHash,
+    'city' => $city,
+    'vehicle_type' => $vehicleType,
+    'vehicle_brand' => $vehicleBrand,
+    'vehicle_model' => $vehicleModel,
+    'vehicle_year' => $vehicleYear,
+    'vehicle_color' => $vehicleColor,
+    'license_plate' => $licensePlate,
+    'license_plate_hash' => $plateHash,
+    'terms_version' => $termsVersion,
+    'privacy_version' => $privacyVersion,
+    'accept_terms' => $acceptTerms,
+    'accept_privacy' => $acceptPrivacy,
+    'accept_contact' => $acceptContact,
+    'source' => $source,
+    'submitted_ip_hash' => hd_hash_ip(),
+];
+
+if ($existingId !== null) {
     $existing = $stored['applications'][$applicationId] ?? [];
     if (($existing['status'] ?? '') === 'received') {
+        rd_sync_higo_application($smtpCfg, $syncPayload + ['status' => 'received']);
         rd_send(200, [
             'ok' => true,
             'application_id' => $applicationId,
@@ -167,6 +200,13 @@ if ($existingId !== null) {
             'duplicate' => true,
         ]);
     }
+}
+
+if (!rd_sync_higo_application($smtpCfg, $syncPayload + [
+    'status' => 'pending_delivery',
+    'confirmation_email_sent' => false,
+])) {
+    rd_send(503, ['ok' => false, 'error' => 'admin_sync_failed']);
 }
 
 $vehicleLabels = ['moto' => 'Moto', 'carro' => 'Carro', 'camioneta' => 'Camioneta'];
@@ -198,13 +238,17 @@ $adminHtml = '<!doctype html><html lang="es"><body style="margin:0;background:#f
     . '<table role="presentation" width="100%"><tr><td align="center"><table role="presentation" width="640" style="max-width:640px;background:#fff;border-radius:14px;overflow:hidden;">'
     . '<tr><td style="padding:24px;background:#315ef4;color:#fff;"><h1 style="margin:0;font-size:22px;">Nueva solicitud Higo Driver</h1><p style="margin:6px 0 0;">' . $safe($applicationId) . '</p></td></tr>'
     . '<tr><td style="padding:22px;"><table role="presentation" width="100%" style="border:1px solid #e5e7eb;border-radius:10px;border-collapse:collapse;">' . $rowsHtml . '</table>'
-    . '<p style="margin:18px 0 0;color:#475569;font-size:13px;">Este pre-registro no contiene documentos. Continúa la verificación mediante el flujo seguro de onboarding de Higo.</p></td></tr>'
+    . '<p style="margin:18px 0 0;color:#475569;font-size:13px;">Esta solicitud también está disponible en el panel administrativo de Higo App.</p></td></tr>'
     . '</table></td></tr></table></body></html>';
 
 $adminSubject = 'Nueva solicitud Higo Driver - ' . $applicationId;
 $adminSent = rd_smtp_send($smtpCfg, 'admin@higodriver.com', $adminSubject, $adminHtml, $plain, $email);
 if (!$adminSent) {
     rd_update_application_status($applicationId, 'delivery_failed');
+    rd_sync_higo_application($smtpCfg, $syncPayload + [
+        'status' => 'delivery_failed',
+        'confirmation_email_sent' => false,
+    ]);
     rd_send(502, ['ok' => false, 'error' => 'mail_failed']);
 }
 
@@ -223,12 +267,21 @@ $applicantHtml = '<!doctype html><html lang="es"><body style="margin:0;backgroun
     . '</table></td></tr></table></body></html>';
 $confirmationSent = rd_smtp_send($smtpCfg, $email, $applicantSubject, $applicantHtml, $applicantPlain, (string) $smtpCfg['from_email']);
 
+$centralSynced = rd_sync_higo_application($smtpCfg, $syncPayload + [
+    'status' => 'received',
+    'confirmation_email_sent' => $confirmationSent,
+]);
+if (!$centralSynced) {
+    error_log('register-driver: final Higo administration sync failed for ' . $applicationId);
+}
+
 hd_increment_funnel('application_submitted', ['vehicle_type' => $vehicleType]);
 rd_send(200, [
     'ok' => true,
     'application_id' => $applicationId,
     'status_url' => '/status/?id=' . rawurlencode($applicationId),
     'confirmation_email_sent' => $confirmationSent,
+    'admin_sync_confirmed' => $centralSynced,
 ]);
 
 function rd_update_application_status(string $applicationId, string $status): void {
@@ -239,6 +292,40 @@ function rd_update_application_status(string $applicationId, string $status): vo
         }
         return $store;
     });
+}
+
+function rd_sync_higo_application(array $cfg, array $payload): bool {
+    $secret = trim((string) ($cfg['higo_app_ingest_secret'] ?? ''));
+    if ($secret === '') return false;
+    $baseUrl = rtrim((string) ($cfg['higo_app_base_url'] ?? 'https://higoapp.com'), '/');
+    $body = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if ($body === false) return false;
+
+    $ch = curl_init($baseUrl . '/api/driver-applications-ingest.php');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 25,
+        CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2,
+        CURLOPT_POSTFIELDS => $body,
+        CURLOPT_HTTPHEADER => [
+            'Content-Type: application/json',
+            'Accept: application/json',
+            'X-Higo-Driver-Secret: ' . $secret,
+        ],
+    ]);
+    $response = curl_exec($ch);
+    $error = curl_error($ch);
+    $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($response === false || $status < 200 || $status >= 300) {
+        error_log('rd_sync_higo_application failed HTTP ' . $status . ' ' . $error . ' ' . substr((string) $response, 0, 220));
+        return false;
+    }
+    $decoded = json_decode((string) $response, true);
+    return is_array($decoded) && ($decoded['ok'] ?? false) === true;
 }
 
 function rd_smtp_send(array $cfg, string $to, string $subject, string $html, string $plain, string $replyTo): bool {
