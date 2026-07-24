@@ -17,15 +17,22 @@
     }
 
     function formatError(code, detail) {
+        var labels = {
+            identity: 'cédula de identidad',
+            driver_license: 'licencia de conducir',
+            vehicle_registration: 'certificado de circulación',
+            rcv: 'RCV vigente',
+            vehicle_photo: 'fotografía del vehículo'
+        };
         var messages = {
-            invalid_or_expired_token: 'Este enlace no es válido o ya venció. Solicita uno nuevo al equipo Higo.',
+            invalid_or_expired_token: 'Este enlace no es válido, está siendo utilizado o ya venció. Solicita uno nuevo al equipo Higo.',
             documents_not_expected: 'La solicitud no está habilitada actualmente para recibir documentos.',
             no_documents: 'Selecciona los documentos requeridos antes de continuar.',
+            missing_required_document: 'Falta un documento obligatorio: ' + (labels[detail] || detail || 'requisito sin identificar') + '.',
             invalid_file_size: 'Uno de los archivos supera el máximo permitido de 8 MB.',
             total_upload_too_large: 'El conjunto de archivos supera el máximo permitido de 30 MB.',
             invalid_file_type: 'Uno de los archivos no tiene un formato permitido.',
-            storage_upload_failed: 'No pudimos almacenar uno de los archivos. Intenta nuevamente.',
-            document_metadata_failed: 'Los archivos se recibieron parcialmente. Contacta al equipo Higo antes de repetir el envío.',
+            document_upload_not_completed: 'La carga no pudo finalizar de forma segura. Ningún envío incompleto será procesado; intenta nuevamente.',
             upstream_unavailable: 'El servicio de verificación está temporalmente no disponible.',
             rate_limited: 'Has realizado varios intentos. Espera un minuto antes de volver a enviar.'
         };
