@@ -1,0 +1,32 @@
+name: Quality Gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate PHP syntax
+        run: find api -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Validate JavaScript syntax
+        run: node --check assets/app.js
+      - name: Guard against committed secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! git ls-files | grep -Ei '(^|/)(_smtp_config\.php|\.env($|\.)|.*service-account.*\.json|credentials.*\.json|.*\.pem|.*\.key)$'
+      - name: Verify required production files
+        run: |
+          test -f index.html
+          test -f status/index.html
+          test -f api/register-driver.php
+          test -f api/application-status.php
+          test -f api/public-config.php
+          test -f api/track.php
