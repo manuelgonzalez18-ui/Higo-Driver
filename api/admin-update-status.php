@@ -2,6 +2,9 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/_private.php';
+require_once __DIR__ . '/_ratelimit.php';
+
+api_rate_limit('admin-update-status', 20, sys_get_temp_dir() . '/higodriver_admin_status.log');
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
