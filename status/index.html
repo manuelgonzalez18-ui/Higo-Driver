@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Estado de solicitud · Higo Driver</title>
+    <meta name="description" content="Consulta el estado de tu pre-registro como conductor Higo.">
+    <meta name="robots" content="noindex,follow">
+    <meta name="theme-color" content="#07132f">
+    <link rel="canonical" href="https://higodriver.com/status/">
+    <link rel="icon" type="image/svg+xml" href="/assets/logo.svg">
+    <link rel="stylesheet" href="/assets/style.css">
+    <script src="/assets/app.js" defer></script>
+</head>
+<body class="status-page" data-page="status">
+<a class="skip-link" href="#contenido">Saltar al contenido</a>
+<header class="site-header">
+    <nav class="nav" aria-label="Navegación principal">
+        <a class="brand" href="/"><img src="/assets/logo.svg" alt="" width="38" height="38"><span>Higo <strong>Driver</strong></span></a>
+        <div class="nav-links"><a class="nav-status" href="/">Volver al inicio</a></div>
+    </nav>
+</header>
+<main id="contenido" class="status-main">
+    <section class="status-card">
+        <p class="eyebrow">Seguimiento de solicitud</p>
+        <h1>Consulta tu pre-registro</h1>
+        <p>Ingresa el código de solicitud y el mismo correo utilizado durante el registro. No mostraremos información personal.</p>
+        <form id="applicationStatusForm" class="status-form" novalidate>
+            <div class="field">
+                <label for="application_id">Código de solicitud</label>
+                <input id="application_id" name="application_id" type="text" required maxlength="24" autocomplete="off" placeholder="HD-20260724-ABC12345">
+            </div>
+            <div class="field">
+                <label for="status_email">Correo electrónico</label>
+                <input id="status_email" name="email" type="email" required maxlength="160" autocomplete="email" placeholder="tu@correo.com">
+            </div>
+            <button type="submit" class="btn btn-primary">Consultar</button>
+        </form>
+        <div id="statusResult" class="status-result" aria-live="polite"></div>
+        <p class="catalog-note">Por seguridad, una combinación incorrecta de código y correo devuelve una respuesta genérica.</p>
+    </section>
+</main>
+<footer class="site-footer">
+    <div class="footer-inner"><div><small>© 2026 Higo · Venezuela</small></div><div class="footer-links"><a href="/privacy/">Privacidad</a><a href="/terms-and-conditions/">Términos</a></div></div>
+</footer>
+</body>
+</html>
