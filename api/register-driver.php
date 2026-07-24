@@ -33,9 +33,9 @@ $termsVersionExpected = '2026-05-19';
 $privacyVersionExpected = '2026-05-19';
 
 $fullName = trim((string) ($_POST['full_name'] ?? ''));
-$cedula = strtoupper(trim((string) ($_POST['cedula'] ?? ''));
+$cedula = strtoupper(trim((string) ($_POST['cedula'] ?? '')));
 $phone = trim((string) ($_POST['phone'] ?? ''));
-$email = strtolower(trim((string) ($_POST['email'] ?? ''));
+$email = strtolower(trim((string) ($_POST['email'] ?? '')));
 $city = trim((string) ($_POST['city'] ?? ''));
 $vehicleType = trim((string) ($_POST['vehicle_type'] ?? ''));
 $vehicleBrand = trim((string) ($_POST['vehicle_brand'] ?? ''));
