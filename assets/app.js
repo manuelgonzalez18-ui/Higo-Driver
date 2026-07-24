@@ -192,7 +192,9 @@
                             mail_failed: 'No pudimos entregar la solicitud al equipo. Intenta nuevamente en unos minutos.',
                             storage_failed: 'No pudimos guardar la solicitud. Intenta nuevamente.',
                             mail_config_missing: 'El servicio de correo no está disponible temporalmente.',
-                            mail_config_invalid: 'El servicio de correo no está configurado correctamente.'
+                            mail_config_invalid: 'El servicio de correo no está configurado correctamente.',
+                            admin_integration_not_configured: 'La integración administrativa está en configuración. Intenta nuevamente en unos minutos.',
+                            admin_sync_failed: 'No pudimos registrar la solicitud en el panel administrativo. Intenta nuevamente en unos minutos.'
                         };
                         track('form_error', { error: code, field: result.body.detail || '' });
                         throw new Error(messages[code] || 'No pudimos enviar la solicitud. Intenta nuevamente o contáctanos por WhatsApp.');
@@ -236,9 +238,21 @@
                 .then(function (data) {
                     if (!data.response.ok || !data.body.ok) throw new Error(data.body.error === 'not_found' ? 'No encontramos una solicitud con esos datos.' : 'No pudimos consultar la solicitud.');
                     var status = data.body.status;
-                    var stages = ['received', 'under_review', 'documents_requested', 'approved'];
-                    var current = Math.max(0, stages.indexOf(status));
-                    var labels = ['Solicitud recibida', 'Revisión inicial', 'Verificación de documentos', 'Aprobación'];
+                    var stageMap = {
+                        pending_delivery: 0,
+                        delivery_failed: 0,
+                        received: 0,
+                        under_review: 1,
+                        waitlist: 1,
+                        rejected: 1,
+                        documents_requested: 2,
+                        documents_submitted: 2,
+                        correction_requested: 2,
+                        approved: 3,
+                        converted: 4
+                    };
+                    var current = Object.prototype.hasOwnProperty.call(stageMap, status) ? stageMap[status] : 0;
+                    var labels = ['Solicitud recibida', 'Revisión inicial', 'Verificación de documentos', 'Aprobación', 'Cuenta creada'];
                     var timeline = labels.map(function (label, index) { return '<li class="' + (index <= current ? 'is-done' : '') + '">' + escapeHtml(label) + '</li>'; }).join('');
                     result.innerHTML = '<div class="status-summary"><p class="eyebrow">' + escapeHtml(data.body.application_id) + '</p><h2>' + escapeHtml(data.body.status_label) + '</h2><p>' + escapeHtml(data.body.next_step) + '</p></div><ol class="timeline">' + timeline + '</ol>';
                     result.className = 'status-result is-visible';
