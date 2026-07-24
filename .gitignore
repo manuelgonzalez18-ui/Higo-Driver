@@ -1,0 +1,21 @@
+﻿# Credenciales y configuración privada
+api/_smtp_config.php
+.env
+.env.*
+*.pem
+*.key
+*service-account*.json
+credentials*.json
+
+# Dependencias, compilación y temporales
+node_modules/
+dist/
+build/
+*.zip
+*.log
+Thumbs.db
+.DS_Store
+
+# Editores
+.vscode/
+.idea/
