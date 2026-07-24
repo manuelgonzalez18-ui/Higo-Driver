@@ -3,22 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Eliminar tu cuenta · Higo App</title>
-    <meta name="description" content="Cómo solicitar la eliminación de tu cuenta de Higo y de los datos asociados. Qué datos se eliminan, cuáles se retienen por obligación legal y en qué plazo.">
-    <meta name="author" content="Higo App">
+    <title>Eliminar cuenta y datos · Higo App</title>
+    <meta name="description" content="Página oficial para solicitar la eliminación de una cuenta de Higo App y de los datos personales asociados. Incluye el proceso, los plazos y los datos que pueden conservarse por obligación legal.">
+    <meta name="author" content="Higo Technologies Inc · Higo Technologies C.A.">
     <meta name="theme-color" content="#0A1330">
     <meta name="robots" content="index,follow">
 
     <meta property="og:type" content="article">
-    <meta property="og:title" content="Eliminar tu cuenta · Higo App">
-    <meta property="og:description" content="Solicita la eliminación de tu cuenta de Higo y de los datos asociados.">
-    <meta property="og:url" content="https://higodriver.com/eliminar-cuenta/">
+    <meta property="og:title" content="Eliminar cuenta y datos · Higo App">
+    <meta property="og:description" content="Solicita la eliminación de tu cuenta de Higo y de los datos personales asociados.">
+    <meta property="og:url" content="https://higodriver.com/privacys/">
     <meta property="og:image" content="https://higodriver.com/assets/logo.svg">
     <meta property="og:locale" content="es_VE">
 
-    <link rel="canonical" href="https://higodriver.com/eliminar-cuenta/">
-    <link rel="icon" type="image/svg+xml" href="/assets/logo.svg">
-    <link rel="stylesheet" href="/assets/style.css">
+    <link rel="canonical" href="https://higodriver.com/privacys/">
+    <link rel="icon" type="image/svg+xml" href="/assets/logo.svg?v=20260724c">
+    <link rel="stylesheet" href="/assets/style.css?v=20260724c">
 
     <style>
         .legal-wrap {
@@ -37,50 +37,43 @@
             margin-bottom: 20px;
         }
         .legal-wrap h1 {
-            font-size: clamp(26px, 4vw, 36px);
-            line-height: 1.2;
-            margin: 0 0 6px;
+            font-size: clamp(30px, 5vw, 46px);
+            line-height: 1.12;
+            margin: 0 0 10px;
             color: #fff;
-            letter-spacing: -0.5px;
+            letter-spacing: -0.8px;
         }
         .legal-wrap .meta {
             color: #94a3b8;
-            font-size: 13px;
-            margin-bottom: 32px;
+            font-size: 14px;
+            margin-bottom: 28px;
             border-bottom: 1px solid rgba(255,255,255,0.08);
-            padding-bottom: 20px;
+            padding-bottom: 22px;
         }
         .legal-wrap h2 {
-            font-size: 19px;
+            font-size: 21px;
             color: #fff;
-            margin: 36px 0 12px;
-            padding-top: 14px;
+            margin: 38px 0 12px;
+            padding-top: 16px;
             border-top: 1px solid rgba(255,255,255,0.06);
             letter-spacing: -0.2px;
         }
-        .legal-wrap h3 {
-            font-size: 15px;
-            color: #fff;
-            margin: 18px 0 8px;
-            letter-spacing: 0.2px;
-        }
         .legal-wrap p {
-            font-size: 15px;
-            line-height: 1.7;
+            font-size: 16px;
+            line-height: 1.75;
             color: #d1d5db;
-            margin: 0 0 12px;
+            margin: 0 0 14px;
         }
         .legal-wrap p strong { color: #fff; }
-        .legal-wrap ol,
         .legal-wrap ul {
-            padding-left: 20px;
-            margin: 0 0 16px;
+            padding-left: 22px;
+            margin: 0 0 18px;
         }
         .legal-wrap li {
-            font-size: 15px;
+            font-size: 16px;
             line-height: 1.7;
             color: #d1d5db;
-            margin-bottom: 6px;
+            margin-bottom: 7px;
         }
         .legal-wrap code {
             background: rgba(255,255,255,0.08);
@@ -89,18 +82,41 @@
             border-radius: 4px;
             font-size: 13px;
         }
+        .official-card {
+            background: linear-gradient(135deg, rgba(37,99,235,0.18), rgba(96,165,250,0.08));
+            border: 1px solid rgba(96,165,250,0.35);
+            border-radius: 16px;
+            padding: 20px;
+            margin: 18px 0 28px;
+        }
+        .official-card strong {
+            display: block;
+            color: #fff;
+            font-size: 19px;
+            margin-bottom: 6px;
+        }
+        .official-card p { margin: 0; }
         .legal-wrap .callout {
             background: rgba(220, 38, 38, 0.08);
             border: 1px solid rgba(220, 38, 38, 0.30);
             border-radius: 12px;
             padding: 14px 18px;
-            margin: 16px 0;
+            margin: 18px 0;
             font-size: 14px;
             color: #fecaca;
         }
         .legal-wrap .callout strong { color: #fff; }
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin: 18px 0 8px;
+        }
         .legal-wrap .cta {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 48px;
             background: #2563EB;
             color: #fff;
             text-decoration: none;
@@ -108,24 +124,27 @@
             font-size: 15px;
             padding: 13px 22px;
             border-radius: 10px;
-            margin: 8px 0 4px;
         }
         .legal-wrap .cta.alt {
             background: rgba(255,255,255,0.06);
             border: 1px solid rgba(255,255,255,0.14);
+        }
+        .legal-wrap .cta.play {
+            background: #111827;
+            border: 1px solid rgba(255,255,255,0.18);
         }
         .legal-wrap .steps {
             background: rgba(255,255,255,0.04);
             border: 1px solid rgba(255,255,255,0.08);
             border-radius: 12px;
             padding: 16px 20px 8px;
-            margin: 16px 0 24px;
+            margin: 18px 0 24px;
         }
         .legal-wrap .signoff {
-            margin-top: 40px;
-            padding-top: 20px;
+            margin-top: 42px;
+            padding-top: 22px;
             border-top: 1px solid rgba(255,255,255,0.08);
-            font-size: 12px;
+            font-size: 13px;
             color: #94a3b8;
             line-height: 1.7;
         }
@@ -134,115 +153,119 @@
             padding: 18px 24px;
             display: flex;
             align-items: center;
-            gap: 12px;
+            justify-content: space-between;
+            gap: 16px;
             border-bottom: 1px solid rgba(255,255,255,0.06);
         }
         .top-nav img { width: 28px; height: 28px; }
         .top-nav strong { color: #fff; font-size: 16px; }
+        .top-nav .play-link { color: #93c5fd; text-decoration: none; font-weight: 700; font-size: 14px; }
+        @media (max-width: 640px) {
+            .actions .cta { width: 100%; }
+            .top-nav .play-link { display: none; }
+        }
     </style>
 </head>
 <body>
 
 <header class="top-nav">
     <a href="/" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:#fff;">
-        <img src="/assets/logo.svg" alt="Logo Higo">
+        <img src="/assets/logo.svg?v=20260724c" alt="Logo Higo">
         <strong>Higo App</strong>
     </a>
+    <a class="play-link" href="https://play.google.com/store/apps/details?id=com.higoapp.ve" target="_blank" rel="noopener">Descargar en Google Play</a>
 </header>
 
 <main class="legal-wrap">
     <a href="/" class="crumb">← Volver al inicio</a>
 
     <h1>Eliminar tu cuenta de Higo</h1>
-    <p class="meta"><strong>Aplica a:</strong> Higo App (<code>com.higoapp.ve</code>) y Higo Driver · Higo Inc. / Higo C.A.</p>
+    <p class="meta"><strong>Aplicación:</strong> Higo App (<code>com.higoapp.ve</code>) y Higo Driver · <strong>Empresas responsables:</strong> Higo Technologies Inc y Higo Technologies C.A.</p>
+
+    <div class="official-card">
+        <strong>Página oficial para eliminar una cuenta</strong>
+        <p>Desde esta página puedes solicitar la eliminación permanente de tu cuenta de Higo y de los datos personales asociados. No necesitas volver a instalar la aplicación para realizar la solicitud.</p>
+    </div>
 
     <p>
-        Esta página explica cómo solicitar la <strong>eliminación de tu cuenta de Higo</strong> y de
-        los datos personales asociados a ella. Aplica tanto a los usuarios de la app de clientes
-        (pasajeros, remitentes y destinatarios) como a los conductores. No necesitás volver a
-        iniciar sesión ni reinstalar la aplicación para hacer esta solicitud.
+        Este procedimiento aplica tanto a usuarios de la aplicación de clientes —pasajeros, remitentes
+        y destinatarios— como a conductores registrados en Higo.
     </p>
+
+    <div class="actions" aria-label="Acciones principales">
+        <a class="cta" href="mailto:soporte@higodriver.com?subject=Solicitud%20de%20eliminaci%C3%B3n%20de%20cuenta&amp;body=Hola%2C%20solicito%20la%20eliminaci%C3%B3n%20de%20mi%20cuenta%20de%20Higo%20y%20de%20mis%20datos%20asociados.%0A%0ACorreo%20de%20mi%20cuenta%3A%20%0ANombre%20completo%3A%20%0ATel%C3%A9fono%20registrado%3A%20%0A%0AConfirmo%20que%20soy%20el%20titular%20de%20esta%20cuenta.">
+            Solicitar eliminación por correo
+        </a>
+        <a class="cta alt" href="https://wa.me/584120330315?text=Hola%2C%20solicito%20eliminar%20mi%20cuenta%20de%20Higo%20y%20mis%20datos%20asociados." target="_blank" rel="noopener">
+            WhatsApp de soporte
+        </a>
+        <a class="cta play" href="https://play.google.com/store/apps/details?id=com.higoapp.ve" target="_blank" rel="noopener">
+            Descargar Higo en Google Play
+        </a>
+    </div>
 
     <h2>Cómo solicitar la eliminación</h2>
     <p>
-        Enviá una solicitud desde el <strong>correo electrónico con el que te registraste en Higo</strong>
-        (esto nos permite verificar tu identidad) a nuestro canal de soporte. Podés usar el botón de
-        abajo, que ya deja el mensaje listo:
-    </p>
-
-    <p>
-        <a class="cta" href="mailto:soporte@higodriver.com?subject=Solicitud%20de%20eliminaci%C3%B3n%20de%20cuenta&amp;body=Hola%2C%20solicito%20la%20eliminaci%C3%B3n%20de%20mi%20cuenta%20de%20Higo%20y%20de%20mis%20datos%20asociados.%0A%0ACorreo%20de%20mi%20cuenta%3A%20%0ANombre%20completo%3A%20%0ATel%C3%A9fono%20registrado%3A%20%0A%0AConfirmo%20que%20soy%20el%20titular%20de%20esta%20cuenta.">
-            ✉️ Solicitar eliminación por correo
-        </a>
-        &nbsp;
-        <a class="cta alt" href="https://wa.me/584120330315?text=Hola%2C%20solicito%20eliminar%20mi%20cuenta%20de%20Higo%20y%20mis%20datos%20asociados.">
-            WhatsApp de soporte
-        </a>
+        Envía la solicitud desde el <strong>correo electrónico con el que te registraste en Higo</strong>.
+        Esto nos permite verificar que eres la persona titular de la cuenta.
     </p>
 
     <div class="steps">
-        <p><strong>En tu solicitud incluí:</strong></p>
+        <p><strong>Incluye en tu solicitud:</strong></p>
         <ul>
             <li>El <strong>correo electrónico</strong> con el que creaste tu cuenta.</li>
             <li>Tu <strong>nombre completo</strong> y el <strong>teléfono</strong> registrado.</li>
-            <li>Una línea confirmando que sos el titular y que querés eliminar la cuenta.</li>
+            <li>Una confirmación expresa de que deseas eliminar la cuenta y sus datos asociados.</li>
         </ul>
     </div>
 
     <p>
         Correos de contacto: <a href="mailto:soporte@higodriver.com" style="color:#60A5FA;">soporte@higodriver.com</a>
         o <a href="mailto:legal@higodriver.com" style="color:#60A5FA;">legal@higodriver.com</a>.
-        También podés escribir por WhatsApp al
-        <a href="https://wa.me/584120330315" style="color:#60A5FA;">+58 412 033 0315</a>.
+        También puedes escribir por WhatsApp al
+        <a href="https://wa.me/584120330315" style="color:#60A5FA;" target="_blank" rel="noopener">+58 412 033 0315</a>.
     </p>
 
     <div class="callout">
-        <strong>Verificación de identidad.</strong> Por tu seguridad, solo procesamos la eliminación
-        cuando la solicitud llega desde el correo registrado o cuando podemos confirmar la titularidad
-        de la cuenta. Esto evita que un tercero elimine tu cuenta sin tu consentimiento.
+        <strong>Verificación de identidad.</strong> Por seguridad, procesamos la eliminación cuando la
+        solicitud llega desde el correo registrado o cuando podemos confirmar la titularidad. Esto evita
+        que otra persona elimine tu cuenta sin autorización.
     </div>
 
     <h2>Qué datos se eliminan</h2>
-    <p>Al procesar tu solicitud eliminamos de forma permanente:</p>
+    <p>Al procesar una solicitud verificada eliminamos de forma permanente, cuando corresponda:</p>
     <ul>
-        <li>Tu <strong>perfil y credenciales de acceso</strong> (nombre, correo, teléfono, foto de perfil).</li>
-        <li>Tus <strong>direcciones guardadas</strong> y preferencias.</li>
-        <li>Tu <strong>historial de ubicación en tiempo real</strong> asociado a la cuenta.</li>
-        <li>Los <strong>documentos de validación del conductor</strong> (cédula, licencia, certificado
-            médico, RCV, fotos del vehículo) y los datos de Pago Móvil, cuando aplique.</li>
-        <li>Tus <strong>mensajes de chat/soporte</strong> y datos de dispositivo (token de notificaciones).</li>
+        <li>El <strong>perfil y las credenciales de acceso</strong>, incluidos nombre, correo, teléfono y foto de perfil.</li>
+        <li>Las <strong>direcciones guardadas</strong> y preferencias vinculadas a la cuenta.</li>
+        <li>El <strong>historial de ubicación</strong> asociado al perfil, salvo registros sujetos a retención legal.</li>
+        <li>Los <strong>documentos de validación del conductor</strong>, como cédula, licencia, certificado médico, RCV y fotografías del vehículo, cuando aplique.</li>
+        <li>Los datos del dispositivo, tokens de notificaciones y demás información que ya no sea necesaria.</li>
     </ul>
 
-    <h2>Qué datos se retienen y por cuánto</h2>
+    <h2>Qué datos pueden conservarse y por cuánto tiempo</h2>
     <p>
-        Cierta información se conserva únicamente cuando la ley lo exige o para resolver
-        obligaciones pendientes, y se elimina al vencer el plazo correspondiente:
+        Cierta información puede conservarse únicamente cuando sea necesaria para cumplir obligaciones
+        legales, fiscales, contables, de seguridad, prevención de fraude o resolución de reclamos.
     </p>
     <ul>
-        <li><strong>Registros de transacciones y pagos</strong> (montos, referencias, comprobantes):
-            se retienen por el período que exigen las obligaciones fiscales y contables aplicables,
-            típicamente hasta <strong>5 años</strong>.</li>
-        <li><strong>Registros de viajes/envíos con incidencias o reclamos abiertos</strong>: se
-            conservan hasta que se resuelva la disputa.</li>
-        <li><strong>Datos exigidos por seguridad o prevención de fraude</strong>: se conservan el
-            mínimo tiempo necesario para cumplir ese fin.</li>
+        <li><strong>Registros de transacciones y pagos:</strong> durante el período exigido por las obligaciones fiscales y contables aplicables, que puede ser de hasta <strong>5 años</strong>.</li>
+        <li><strong>Viajes, envíos o reclamos pendientes:</strong> hasta resolver la incidencia o disputa.</li>
+        <li><strong>Registros de seguridad y prevención de fraude:</strong> durante el tiempo mínimo necesario para cumplir esa finalidad.</li>
     </ul>
-    <p>
-        Estos registros se guardan de forma disociada de tu perfil siempre que sea posible y no se
-        usan para ningún otro propósito.
-    </p>
+    <p>Siempre que sea posible, estos registros se conservan separados del perfil activo y no se utilizan para otros fines.</p>
 
-    <h2>En cuánto tiempo</h2>
+    <h2>Plazo de procesamiento</h2>
     <p>
-        Procesamos las solicitudes verificadas en un plazo de hasta <strong>30 días</strong>. Te
-        confirmamos por correo cuando la eliminación se completa. Los datos sujetos a retención legal
-        (arriba) se eliminan automáticamente al vencer su plazo.
+        Las solicitudes verificadas se procesan en un plazo de hasta <strong>30 días</strong>. Enviaremos
+        una confirmación al correo de contacto cuando la eliminación se haya completado. Los datos sujetos
+        a retención legal se eliminarán al vencer el plazo correspondiente.
     </p>
 
     <p class="signoff">
-        Higo Inc. (Delaware, EE. UU.) · Higo C.A. (Venezuela) · Plataforma tecnológica de
-        intermediación. Para más detalle sobre el tratamiento de tus datos, consultá nuestra
-        <a href="https://higodriver.com/privacy/">Política de Privacidad</a>.
+        <strong>Higo Technologies Inc</strong> (Delaware, EE. UU.) · <strong>Higo Technologies C.A.</strong>
+        (Venezuela) · Plataforma tecnológica de intermediación. Para conocer más sobre el tratamiento de
+        datos personales, consulta la <a href="/privacy/">Política de Privacidad</a> o descarga
+        <a href="https://play.google.com/store/apps/details?id=com.higoapp.ve" target="_blank" rel="noopener">Higo App en Google Play</a>.
     </p>
 </main>
 
