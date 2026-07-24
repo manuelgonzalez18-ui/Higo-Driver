@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Carga segura de documentos · Higo Driver</title>
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <meta name="theme-color" content="#07132f">
+    <link rel="icon" type="image/svg+xml" href="/assets/logo.svg?v=20260724b">
+    <link rel="stylesheet" href="/assets/documents.css?v=20260724d">
+    <script src="/assets/documents.js?v=20260724d" defer></script>
+</head>
+<body>
+    <header class="header">
+        <a class="brand" href="/" aria-label="Volver a Higo Driver">
+            <img src="/assets/logo.svg?v=20260724b" alt="" width="40" height="40">
+            <span>Higo <strong>Driver</strong></span>
+        </a>
+        <span class="secure-badge">Conexión segura</span>
+    </header>
+
+    <main class="page">
+        <section class="intro">
+            <p class="eyebrow">Onboarding verificado</p>
+            <h1>Carga tus documentos de forma segura</h1>
+            <p>Este enlace fue generado específicamente para tu solicitud. Los archivos se almacenan en un espacio privado y solo pueden ser revisados por el equipo autorizado de Higo.</p>
+            <div class="notice"><strong>No compartas este enlace.</strong> Higo Technologies Inc y Higo Technologies C.A. nunca te pedirán que cargues estos documentos en un dominio distinto a <strong>higodriver.com</strong>.</div>
+        </section>
+
+        <section class="card" aria-labelledby="formTitle">
+            <div class="card-head">
+                <div>
+                    <p class="eyebrow">Requisitos</p>
+                    <h2 id="formTitle">Documentación del conductor</h2>
+                </div>
+                <span>PDF, JPG, PNG o WEBP · máximo 8 MB por archivo</span>
+            </div>
+
+            <div id="pageMessage" class="message" role="status" aria-live="polite"></div>
+
+            <form id="documentsForm" enctype="multipart/form-data" novalidate>
+                <div class="grid">
+                    <label class="upload-field">
+                        <span><strong>Cédula de identidad</strong><small>Documento vigente y legible.</small></span>
+                        <input type="file" name="identity" accept="image/jpeg,image/png,image/webp,application/pdf" required>
+                    </label>
+                    <label class="upload-field">
+                        <span><strong>Licencia de conducir</strong><small>Correspondiente al tipo de vehículo.</small></span>
+                        <input type="file" name="driver_license" accept="image/jpeg,image/png,image/webp,application/pdf" required>
+                    </label>
+                    <label class="upload-field">
+                        <span><strong>Certificado de circulación</strong><small>Datos del vehículo y placa visibles.</small></span>
+                        <input type="file" name="vehicle_registration" accept="image/jpeg,image/png,image/webp,application/pdf" required>
+                    </label>
+                    <label class="upload-field">
+                        <span><strong>RCV vigente</strong><small>Póliza o certificado de responsabilidad civil.</small></span>
+                        <input type="file" name="rcv" accept="image/jpeg,image/png,image/webp,application/pdf" required>
+                    </label>
+                    <label class="upload-field">
+                        <span><strong>Fotografía del vehículo</strong><small>Vista clara donde pueda verificarse el estado general.</small></span>
+                        <input type="file" name="vehicle_photo" accept="image/jpeg,image/png,image/webp" required>
+                    </label>
+                    <label class="upload-field optional">
+                        <span><strong>Certificado de salud</strong><small>Solo cuando el equipo Higo lo haya solicitado.</small></span>
+                        <input type="file" name="health_certificate" accept="image/jpeg,image/png,image/webp,application/pdf">
+                    </label>
+                    <label class="upload-field optional">
+                        <span><strong>Datos para cobro directo</strong><small>Solo cuando el equipo Higo lo haya solicitado.</small></span>
+                        <input type="file" name="payment_details" accept="image/jpeg,image/png,image/webp,application/pdf">
+                    </label>
+                    <label class="upload-field optional">
+                        <span><strong>Otro requisito</strong><small>Archivo adicional indicado por el equipo.</small></span>
+                        <input type="file" name="other" accept="image/jpeg,image/png,image/webp,application/pdf">
+                    </label>
+                </div>
+
+                <label class="confirm">
+                    <input type="checkbox" id="confirmAccuracy" required>
+                    <span>Confirmo que los documentos pertenecen al aspirante y que la información es auténtica y vigente.</span>
+                </label>
+
+                <button id="submitDocuments" type="submit">Enviar documentos para revisión</button>
+                <p class="privacy">Al enviar, los archivos se vinculan al código de solicitud y quedan sujetos a la política de privacidad y al proceso de verificación de Higo.</p>
+            </form>
+        </section>
+
+        <section class="help">
+            <h2>¿Tienes problemas con el enlace?</h2>
+            <p>Escribe a <a href="mailto:admin@higodriver.com">admin@higodriver.com</a> indicando únicamente tu código de solicitud. No adjuntes documentos directamente al correo salvo que el equipo autorizado te lo indique.</p>
+        </section>
+    </main>
+
+    <footer>© 2026 Higo Technologies Inc · Higo Technologies C.A.</footer>
+</body>
+</html>
