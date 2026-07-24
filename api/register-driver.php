@@ -1,34 +1,15 @@
 <?php
 declare(strict_types=1);
 
-/**
- * api/register-driver.php — Recibe el formulario público de "Unirme como
- * conductor" desde higodriver.com y envía un correo a admin@higodriver.com
- * con los datos y las 7 fotos como adjuntos.
- *
- * Form fields (multipart/form-data):
- *   full_name, cedula, phone, email, city, plan,
- *   vehicle_brand, vehicle_model, vehicle_color, license_plate,
- *   photo_driver, photo_cedula, photo_licencia, photo_rcv,
- *   photo_circulation, photo_health, photo_vehicle
- *
- * Salida: { ok:true } o { ok:false, error, detail? }
- */
-
 require_once __DIR__ . '/_cors.php';
 require_once __DIR__ . '/_ratelimit.php';
-// H1.2 — CORS con whitelist explicita. Reemplaza el patron heredado
-// "Access-Control-Allow-Origin: *". El helper corta el preflight
-// OPTIONS y rechaza orígenes no autorizados con 403.
-hd_apply_cors('POST, OPTIONS');
+require_once __DIR__ . '/_private.php';
 
-// Rate limit: endpoint público que envía correo SMTP con hasta 7 adjuntos
-// (~decenas de MB). Sin freno permitía email-bomb/agotar la cuota SMTP
-// (auditoría 2026-07-02, M4). 3 req/min/IP cubre el uso legítimo (un
-// aspirante enviando su solicitud) y corta ráfagas.
-api_rate_limit('register-driver', 3, sys_get_temp_dir() . '/higodriver_ratelimit.log');
+hd_apply_cors('POST, OPTIONS');
+api_rate_limit('register-driver', 4, sys_get_temp_dir() . '/higodriver_ratelimit.log');
 
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
 
 function rd_send(int $code, array $payload): void {
     http_response_code($code);
@@ -36,15 +17,76 @@ function rd_send(int $code, array $payload): void {
     exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     rd_send(405, ['ok' => false, 'error' => 'method_not_allowed']);
 }
 
-// ═══ Cargar config SMTP ════════════════════════════════════════════════
-// _smtp_config.php vive al lado de este archivo y NO se commitea (está
-// en .gitignore). Debe definir un array con: host, port, username,
-// password, from_email, from_name (opcional), ehlo (opcional).
-// Si falta, fallamos rápido para no perder solicitudes silenciosamente.
+if (!empty($_FILES)) {
+    rd_send(400, ['ok' => false, 'error' => 'document_upload_not_allowed']);
+}
+
+if (!empty($_POST['website'] ?? '')) {
+    rd_send(200, ['ok' => true, 'application_id' => 'HD-RECEIVED']);
+}
+
+$termsVersionExpected = '2026-05-19';
+$privacyVersionExpected = '2026-05-19';
+
+$fullName = trim((string) ($_POST['full_name'] ?? ''));
+$cedula = strtoupper(trim((string) ($_POST['cedula'] ?? '')));
+$phone = trim((string) ($_POST['phone'] ?? ''));
+$email = strtolower(trim((string) ($_POST['email'] ?? '')));
+$city = trim((string) ($_POST['city'] ?? ''));
+$vehicleType = trim((string) ($_POST['vehicle_type'] ?? ''));
+$vehicleBrand = trim((string) ($_POST['vehicle_brand'] ?? ''));
+$vehicleModel = trim((string) ($_POST['vehicle_model'] ?? ''));
+$vehicleYear = trim((string) ($_POST['vehicle_year'] ?? ''));
+$vehicleColor = trim((string) ($_POST['vehicle_color'] ?? ''));
+$licensePlate = strtoupper(preg_replace('/\s+/', '', trim((string) ($_POST['license_plate'] ?? ''))));
+$termsVersion = trim((string) ($_POST['terms_version'] ?? ''));
+$privacyVersion = trim((string) ($_POST['privacy_version'] ?? ''));
+$acceptTerms = (string) ($_POST['accept_terms'] ?? '') === '1';
+$acceptPrivacy = (string) ($_POST['accept_privacy'] ?? '') === '1';
+$acceptContact = (string) ($_POST['accept_contact'] ?? '') === '1';
+$source = trim((string) ($_POST['source'] ?? 'higodriver.com'));
+$idempotencyKey = trim((string) ($_POST['idempotency_key'] ?? ''));
+
+$required = [
+    'full_name' => $fullName,
+    'cedula' => $cedula,
+    'phone' => $phone,
+    'email' => $email,
+    'city' => $city,
+    'vehicle_type' => $vehicleType,
+    'vehicle_brand' => $vehicleBrand,
+    'vehicle_model' => $vehicleModel,
+    'vehicle_color' => $vehicleColor,
+    'license_plate' => $licensePlate,
+    'idempotency_key' => $idempotencyKey,
+];
+foreach ($required as $key => $value) {
+    if ($value === '') rd_send(400, ['ok' => false, 'error' => 'missing_field', 'detail' => $key]);
+}
+
+if (strlen($fullName) < 3 || strlen($fullName) > 200) rd_send(400, ['ok' => false, 'error' => 'invalid_name']);
+if (!preg_match('/^[VEJPG]-?\d{5,12}$/', $cedula)) rd_send(400, ['ok' => false, 'error' => 'invalid_cedula']);
+$phoneDigits = preg_replace('/\D+/', '', $phone);
+if (strlen($phoneDigits) < 10 || strlen($phoneDigits) > 15) rd_send(400, ['ok' => false, 'error' => 'invalid_phone']);
+if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 160) rd_send(400, ['ok' => false, 'error' => 'invalid_email']);
+if (strlen($city) < 2 || strlen($city) > 160) rd_send(400, ['ok' => false, 'error' => 'invalid_city']);
+if (!in_array($vehicleType, ['moto', 'carro', 'camioneta'], true)) rd_send(400, ['ok' => false, 'error' => 'invalid_vehicle_type']);
+if (strlen($vehicleBrand) > 120 || strlen($vehicleModel) > 120 || strlen($vehicleColor) > 80) rd_send(400, ['ok' => false, 'error' => 'invalid_vehicle']);
+if (!preg_match('/^[A-Z0-9-]{3,12}$/', $licensePlate)) rd_send(400, ['ok' => false, 'error' => 'invalid_plate']);
+if ($vehicleYear !== '') {
+    $year = (int) $vehicleYear;
+    if ($year < 1950 || $year > ((int) gmdate('Y') + 1)) rd_send(400, ['ok' => false, 'error' => 'invalid_vehicle_year']);
+}
+if (!$acceptTerms || !$acceptPrivacy) rd_send(400, ['ok' => false, 'error' => 'legal_acceptance_required']);
+if ($termsVersion !== $termsVersionExpected || $privacyVersion !== $privacyVersionExpected) {
+    rd_send(409, ['ok' => false, 'error' => 'legal_version_mismatch']);
+}
+if (!preg_match('/^[a-f0-9]{20,64}$/i', $idempotencyKey)) rd_send(400, ['ok' => false, 'error' => 'invalid_idempotency_key']);
+
 $smtpConfigCandidates = [
     __DIR__ . '/_smtp_config.php',
     dirname(__DIR__, 2) . '/Private/smtp-config.php',
@@ -52,336 +94,233 @@ $smtpConfigCandidates = [
     dirname(__DIR__, 2) . '/private/smtp-config.php',
     dirname(__DIR__, 3) . '/private/smtp-config.php',
 ];
-
-$smtpConfigPath = null;
+$smtpCfg = null;
 foreach ($smtpConfigCandidates as $candidate) {
     if (is_file($candidate)) {
-        $smtpConfigPath = $candidate;
+        $loaded = require $candidate;
+        if (is_array($loaded)) $smtpCfg = $loaded;
         break;
     }
 }
-
-if ($smtpConfigPath === null) {
-    error_log('register-driver: no se encontr? una configuraci?n SMTP privada');
-    rd_send(503, ['ok' => false, 'error' => 'mail_config_missing']);
+if ($smtpCfg === null) rd_send(503, ['ok' => false, 'error' => 'mail_config_missing']);
+foreach (['host', 'port', 'username', 'password', 'from_email'] as $key) {
+    if (empty($smtpCfg[$key])) rd_send(503, ['ok' => false, 'error' => 'mail_config_invalid']);
 }
 
-$smtpCfg = require $smtpConfigPath;
-if (!is_array($smtpCfg) || empty($smtpCfg['host']) || empty($smtpCfg['username']) || empty($smtpCfg['password'])) {
-    error_log('register-driver: configuraci?n SMTP inv?lida');
-    rd_send(503, ['ok' => false, 'error' => 'mail_config_invalid']);
-}
+$idempotencyHash = hash('sha256', strtolower($idempotencyKey));
+$emailHash = hd_hash_email($email);
+$plateHash = hash('sha256', $licensePlate . '|higodriver');
+$now = gmdate('c');
+$applicationId = 'HD-' . gmdate('Ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(6)), 0, 8));
+$existingId = null;
 
-// ═══ Anti-abuso muy básico ════════════════════════════════════════════
-// Honeypot opcional (si en algún momento agregamos un campo invisible).
-if (!empty($_POST['website'] ?? '')) {
-    rd_send(200, ['ok' => true]); // silencio
-}
+$stored = hd_json_mutate('driver-applications.json', function (array $store) use (
+    &$existingId, $applicationId, $idempotencyHash, $emailHash, $plateHash, $phoneDigits,
+    $vehicleType, $city, $termsVersion, $privacyVersion, $acceptContact, $source, $now
+): array {
+    if (!isset($store['version'])) $store['version'] = 1;
+    if (!isset($store['applications']) || !is_array($store['applications'])) $store['applications'] = [];
 
-// ═══ Validación de campos ═════════════════════════════════════════════
-
-$fullName     = trim((string) ($_POST['full_name']     ?? ''));
-$cedula       = trim((string) ($_POST['cedula']        ?? ''));
-$phone        = trim((string) ($_POST['phone']         ?? ''));
-$email        = strtolower(trim((string) ($_POST['email'] ?? '')));
-$city         = trim((string) ($_POST['city']          ?? ''));
-$plan         = trim((string) ($_POST['plan']          ?? ''));
-$vehicleBrand = trim((string) ($_POST['vehicle_brand'] ?? ''));
-$vehicleModel = trim((string) ($_POST['vehicle_model'] ?? ''));
-$vehicleColor = trim((string) ($_POST['vehicle_color'] ?? ''));
-$licensePlate = strtoupper(trim((string) ($_POST['license_plate'] ?? '')));
-
-$required = compact(
-    'fullName', 'cedula', 'phone', 'email', 'city', 'plan',
-    'vehicleBrand', 'vehicleModel', 'vehicleColor', 'licensePlate'
-);
-foreach ($required as $k => $v) {
-    if ($v === '') rd_send(400, ['ok' => false, 'error' => 'missing_field', 'detail' => $k]);
-}
-if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    rd_send(400, ['ok' => false, 'error' => 'invalid_email']);
-}
-if (!in_array($plan, ['moto', 'carro', 'camioneta'], true)) {
-    rd_send(400, ['ok' => false, 'error' => 'invalid_plan']);
-}
-// NOTA seguridad (#9): el aspirante ya NO elige clave acá. Antes el campo
-// `password` viajaba a admin@higodriver.com en texto plano y quedaba en el
-// inbox indefinidamente. Ahora la clave la genera el admin al aprobar
-// (welcome-driver.php, que la crea server-side y se la envía al conductor
-// por su propio correo). Este endpoint solo transporta la solicitud + docs.
-
-// ═══ Validación de archivos ═══════════════════════════════════════════
-
-$fileKeys = [
-    'photo_driver'      => 'Foto del chofer',
-    'photo_cedula'      => 'Foto de la cédula',
-    'photo_licencia'    => 'Foto de la licencia',
-    'photo_rcv'         => 'RCV (Responsabilidad Civil del Vehículo)',
-    'photo_circulation' => 'Certificado de circulación del vehículo',
-    'photo_health'      => 'Certificado de salud',
-    'photo_vehicle'     => 'Foto del vehículo',
-];
-
-$maxBytes  = 8 * 1024 * 1024;
-$allowMime = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf'];
-
-$attachments = [];
-foreach ($fileKeys as $key => $label) {
-    if (empty($_FILES[$key]) || ($_FILES[$key]['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-        rd_send(400, ['ok' => false, 'error' => 'missing_file', 'detail' => $key]);
+    foreach ($store['applications'] as $id => $record) {
+        if (is_array($record) && ($record['idempotency_hash'] ?? '') === $idempotencyHash) {
+            $existingId = (string) $id;
+            return $store;
+        }
     }
-    $f = $_FILES[$key];
-    if ($f['size'] <= 0 || $f['size'] > $maxBytes) {
-        rd_send(400, ['ok' => false, 'error' => 'file_too_large', 'detail' => $key]);
-    }
-    $mime = function_exists('mime_content_type') ? (mime_content_type($f['tmp_name']) ?: '') : '';
-    if ($mime === '' || !in_array($mime, $allowMime, true)) {
-        rd_send(400, ['ok' => false, 'error' => 'invalid_file_type', 'detail' => $key . ' (' . $mime . ')']);
-    }
-    $data = file_get_contents($f['tmp_name']);
-    if ($data === false) {
-        rd_send(500, ['ok' => false, 'error' => 'file_read_failed', 'detail' => $key]);
-    }
-    $ext = pathinfo((string) $f['name'], PATHINFO_EXTENSION) ?: '';
-    if ($ext === '') {
-        $ext = $mime === 'application/pdf' ? 'pdf' : explode('/', $mime)[1] ?? 'bin';
-    }
-    $safeName = preg_replace('/[^A-Za-z0-9_\-]/', '_', $key) . '.' . strtolower($ext);
-    $attachments[] = [
-        'name' => $safeName,
-        'mime' => $mime,
-        'data' => $data,
-        'label' => $label,
+
+    $store['applications'][$applicationId] = [
+        'application_id' => $applicationId,
+        'email_hash' => $emailHash,
+        'phone_last4' => substr($phoneDigits, -4),
+        'plate_hash' => $plateHash,
+        'vehicle_type' => $vehicleType,
+        'city' => substr($city, 0, 80),
+        'status' => 'pending_delivery',
+        'created_at' => $now,
+        'updated_at' => $now,
+        'terms_version' => $termsVersion,
+        'privacy_version' => $privacyVersion,
+        'accept_contact' => $acceptContact,
+        'source' => substr($source, 0, 80),
+        'idempotency_hash' => $idempotencyHash,
+        'ip_hash' => hd_hash_ip(),
     ];
+
+    if (count($store['applications']) > 5000) {
+        uasort($store['applications'], function ($a, $b) {
+            return strcmp((string) ($a['created_at'] ?? ''), (string) ($b['created_at'] ?? ''));
+        });
+        while (count($store['applications']) > 5000) array_shift($store['applications']);
+    }
+    return $store;
+});
+
+if ($stored === null) rd_send(500, ['ok' => false, 'error' => 'storage_failed']);
+if ($existingId !== null) {
+    $applicationId = $existingId;
+    $existing = $stored['applications'][$applicationId] ?? [];
+    if (($existing['status'] ?? '') === 'received') {
+        rd_send(200, [
+            'ok' => true,
+            'application_id' => $applicationId,
+            'status_url' => '/status/?id=' . rawurlencode($applicationId),
+            'duplicate' => true,
+        ]);
+    }
 }
 
-// ═══ Construcción del correo ══════════════════════════════════════════
-
-$planLabel = [
-    'moto'      => 'Higo Moto · $10/mes',
-    'carro'     => 'Higo Carro · $20/mes',
-    'camioneta' => 'Higo Camioneta · $25/mes',
-][$plan];
-
-// Destino: admin@higodriver.com — mailbox que vive en el mismo hosting
-// que el VPS donde corre este script. Entregar al mismo proveedor evita
-// el bloqueo de puerto 25 saliente que tiene el VPS (típico anti-spam
-// de planes KVM de Hostinger). Cualquier intento de mandar a un dominio
-// externo (incluido admin@higoapp.com) se perdía silenciosamente — el
-// mail() retornaba true pero el MTA local no podía relayar.
-//
-// El From queda en noreply@higodriver.com — mismo dominio que el host
-// que ejecuta el script (SPF de higodriver.com incluye al VPS).
-$to      = 'admin@higodriver.com';
-$subject = '=?UTF-8?B?' . base64_encode("Nueva solicitud Higo App — {$fullName}") . '?=';
-
-$safe = fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
-
-$rowsHtml = '';
-$rows = [
-    'Nombre y apellido' => $fullName,
-    'Cédula'            => $cedula,
-    'Teléfono'          => $phone,
-    'Correo'            => $email,
-    'Ciudad / zona'     => $city,
-    'Plan'              => $planLabel,
-    'Marca'             => $vehicleBrand,
-    'Modelo'            => $vehicleModel,
-    'Color'             => $vehicleColor,
-    'Placa'             => $licensePlate,
+$vehicleLabels = ['moto' => 'Moto', 'carro' => 'Carro', 'camioneta' => 'Camioneta'];
+$safe = function (string $value): string { return htmlspecialchars($value, ENT_QUOTES, 'UTF-8'); };
+$adminRows = [
+    'Código' => $applicationId,
+    'Nombre' => $fullName,
+    'Cédula' => $cedula,
+    'Teléfono' => $phone,
+    'Correo' => $email,
+    'Ciudad / zona' => $city,
+    'Modalidad' => $vehicleLabels[$vehicleType],
+    'Vehículo' => trim($vehicleBrand . ' ' . $vehicleModel),
+    'Año' => $vehicleYear === '' ? 'No indicado' : $vehicleYear,
+    'Color' => $vehicleColor,
+    'Placa' => $licensePlate,
+    'Acepta contacto' => $acceptContact ? 'Sí' : 'No',
+    'Versión Términos' => $termsVersion,
+    'Versión Privacidad' => $privacyVersion,
 ];
-foreach ($rows as $k => $v) {
-    $rowsHtml .= '<tr>'
-        . '<td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:12px;text-transform:uppercase;font-weight:700;width:180px;">' . $safe($k) . '</td>'
-        . '<td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:14px;color:#111827;">' . $safe($v) . '</td>'
-        . '</tr>';
+$rowsHtml = '';
+$plain = "Nueva solicitud Higo Driver\n" . str_repeat('-', 48) . "\n";
+foreach ($adminRows as $label => $value) {
+    $rowsHtml .= '<tr><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#64748b;font-size:12px;font-weight:700;width:180px;">' . $safe($label) . '</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#0f172a;font-size:14px;">' . $safe($value) . '</td></tr>';
+    $plain .= $label . ': ' . $value . "\n";
 }
 
-// Recordatorio del próximo paso para el admin. Ya NO incluye contraseña
-// (ver #9): al aprobar, el admin crea el user desde el panel y el sistema
-// genera la clave y se la envía al conductor por correo.
-$credsHtml = '<div style="margin:20px 0 0;padding:16px;background:#eff6ff;border:2px solid #3B82F6;border-radius:10px;">'
-    . '<p style="margin:0 0 10px;font-size:11px;color:#1d4ed8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Próximo paso</p>'
-    . '<p style="margin:0;font-size:13px;color:#111827;line-height:1.5;">'
-    . 'Revisá los documentos adjuntos y, si todo está en orden, creá el conductor desde el panel admin con el correo '
-    . '<strong style="font-family:monospace;">' . $safe($email) . '</strong>. '
-    . 'El sistema genera la contraseña y se la envía al conductor a su correo automáticamente.'
-    . '</p>'
-    . '</div>';
-
-$html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"></head>'
-    . '<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;">'
-    . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0;"><tr><td align="center">'
-    . '<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);">'
-    . '<tr><td style="background:linear-gradient(135deg,#3B82F6,#60A5FA);padding:24px;color:#fff;">'
-    . '<h1 style="margin:0;font-size:20px;">Nueva solicitud de conductor</h1>'
-    . '<p style="margin:6px 0 0;opacity:.9;font-size:13px;">Recibida desde higodriver.com</p>'
-    . '</td></tr>'
-    . '<tr><td style="padding:20px 24px;">'
-    . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">'
-    . $rowsHtml
-    . '</table>'
-    . $credsHtml
-    . '<p style="margin:18px 0 0;font-size:13px;color:#6b7280;">Las 7 fotos están adjuntas en este correo.</p>'
-    . '</td></tr>'
-    . '<tr><td style="padding:14px 24px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280;text-align:center;">'
-    . 'Higo App · higodriver.com'
-    . '</td></tr>'
+$adminHtml = '<!doctype html><html lang="es"><body style="margin:0;background:#f1f5f9;font-family:Arial,sans-serif;padding:24px;">'
+    . '<table role="presentation" width="100%"><tr><td align="center"><table role="presentation" width="640" style="max-width:640px;background:#fff;border-radius:14px;overflow:hidden;">'
+    . '<tr><td style="padding:24px;background:#315ef4;color:#fff;"><h1 style="margin:0;font-size:22px;">Nueva solicitud Higo Driver</h1><p style="margin:6px 0 0;">' . $safe($applicationId) . '</p></td></tr>'
+    . '<tr><td style="padding:22px;"><table role="presentation" width="100%" style="border:1px solid #e5e7eb;border-radius:10px;border-collapse:collapse;">' . $rowsHtml . '</table>'
+    . '<p style="margin:18px 0 0;color:#475569;font-size:13px;">Este pre-registro no contiene documentos. Continúa la verificación mediante el flujo seguro de onboarding de Higo.</p></td></tr>'
     . '</table></td></tr></table></body></html>';
 
-$plain = "Nueva solicitud de conductor recibida en higodriver.com\n"
-    . str_repeat('-', 50) . "\n";
-foreach ($rows as $k => $v) {
-    $plain .= str_pad($k . ':', 22) . $v . "\n";
-}
-$plain .= "\nPROXIMO PASO:\n"
-    . "Revisa los documentos adjuntos y, si todo esta en orden, crea el\n"
-    . "conductor desde el panel admin con el correo: {$email}\n"
-    . "El sistema genera la contrasena y se la envia al conductor por correo.\n";
-$plain .= "\nLas 7 fotos están adjuntas en este correo.\n";
-
-// ═══ Armado MIME (multipart/mixed con alternative anidado) ═════════════
-
-$mixedBoundary = '=_mixed_' . bin2hex(random_bytes(8));
-$altBoundary   = '=_alt_'   . bin2hex(random_bytes(8));
-
-$body  = "--{$mixedBoundary}\r\n";
-$body .= "Content-Type: multipart/alternative; boundary=\"{$altBoundary}\"\r\n\r\n";
-
-$body .= "--{$altBoundary}\r\n";
-$body .= "Content-Type: text/plain; charset=UTF-8\r\n";
-$body .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
-$body .= $plain . "\r\n";
-
-$body .= "--{$altBoundary}\r\n";
-$body .= "Content-Type: text/html; charset=UTF-8\r\n";
-$body .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
-$body .= $html . "\r\n";
-$body .= "--{$altBoundary}--\r\n";
-
-foreach ($attachments as $att) {
-    $body .= "--{$mixedBoundary}\r\n";
-    $body .= "Content-Type: {$att['mime']}; name=\"{$att['name']}\"\r\n";
-    $body .= "Content-Transfer-Encoding: base64\r\n";
-    $body .= "Content-Disposition: attachment; filename=\"{$att['name']}\"\r\n\r\n";
-    $body .= chunk_split(base64_encode($att['data'])) . "\r\n";
-}
-$body .= "--{$mixedBoundary}--\r\n";
-
-// Defensa en profundidad contra email header injection: aunque filter_var
-// validó el formato, algunos MTAs aceptan secuencias \r/\n codificadas y
-// permiten inyectar headers extra (Bcc:, To:, Subject:) si el atacante
-// hace bypass del validador. Strip explicito antes de interpolar.
-$replyTo = str_replace(["\r", "\n", "\0"], '', $email);
-$headers  = "From: " . ($smtpCfg['from_name'] ?? 'Higo Driver') . " <{$smtpCfg['from_email']}>\r\n";
-$headers .= "Reply-To: {$replyTo}\r\n";
-$headers .= "MIME-Version: 1.0\r\n";
-$headers .= "Content-Type: multipart/mixed; boundary=\"{$mixedBoundary}\"\r\n";
-
-// ═══ Envío via SMTP autenticado ════════════════════════════════════════
-// NO usamos mail() porque el VPS de Hostinger tiene puerto 25 saliente
-// bloqueado (anti-spam default de planes KVM). Postfix local aceptaba
-// el mensaje pero nunca lograba relayarlo a ningún MX, devolviendo true
-// silenciosamente. Hablamos directo con smtp.hostinger.com:465 (TLS) y
-// nos autenticamos como admin@higodriver.com (mailbox real del dominio).
-$sent = rd_smtp_send($smtpCfg, $to, $subject, $body, $headers);
-
-if (!$sent) {
+$adminSubject = 'Nueva solicitud Higo Driver - ' . $applicationId;
+$adminSent = rd_smtp_send($smtpCfg, 'admin@higodriver.com', $adminSubject, $adminHtml, $plain, $email);
+if (!$adminSent) {
+    rd_update_application_status($applicationId, 'delivery_failed');
     rd_send(502, ['ok' => false, 'error' => 'mail_failed']);
 }
 
-rd_send(200, ['ok' => true]);
+rd_update_application_status($applicationId, 'received');
 
-// ─── Cliente SMTP minimal ──────────────────────────────────────────────
-// Reemplazo de mail(). Sin dependencias (no PHPMailer, no Composer).
-// Soporta SSL/TLS implícito (puerto 465) y STARTTLS (puerto 587).
-function rd_smtp_send(array $cfg, string $to, string $subject, string $body, string $headers): bool {
-    $host = $cfg['host'];
+$applicantSubject = 'Recibimos tu solicitud Higo Driver - ' . $applicationId;
+$statusUrl = 'https://higodriver.com/status/?id=' . rawurlencode($applicationId);
+$applicantPlain = "Hola {$fullName},\n\nRecibimos tu pre-registro como conductor Higo.\nCódigo: {$applicationId}\nConsulta el estado: {$statusUrl}\n\nNo envíes documentos por enlaces no oficiales. El equipo te indicará el siguiente paso.\n";
+$applicantHtml = '<!doctype html><html lang="es"><body style="margin:0;background:#f1f5f9;font-family:Arial,sans-serif;padding:24px;">'
+    . '<table role="presentation" width="100%"><tr><td align="center"><table role="presentation" width="560" style="max-width:560px;background:#fff;border-radius:14px;overflow:hidden;">'
+    . '<tr><td style="padding:24px;background:#07132f;color:#fff;"><h1 style="margin:0;font-size:22px;">Recibimos tu pre-registro</h1></td></tr>'
+    . '<tr><td style="padding:24px;color:#0f172a;"><p>Hola ' . $safe($fullName) . ',</p><p>Tu solicitud fue recibida. Guarda este código:</p>'
+    . '<p style="font-family:monospace;font-size:20px;font-weight:700;padding:12px;background:#eff6ff;border-radius:8px;">' . $safe($applicationId) . '</p>'
+    . '<p><a href="' . $safe($statusUrl) . '" style="color:#315ef4;font-weight:700;">Consultar estado</a></p>'
+    . '<p style="color:#64748b;font-size:13px;">No envíes documentos por enlaces no oficiales. El equipo Higo te indicará el siguiente paso.</p></td></tr>'
+    . '</table></td></tr></table></body></html>';
+$confirmationSent = rd_smtp_send($smtpCfg, $email, $applicantSubject, $applicantHtml, $applicantPlain, (string) $smtpCfg['from_email']);
+
+hd_increment_funnel('application_submitted', ['vehicle_type' => $vehicleType]);
+rd_send(200, [
+    'ok' => true,
+    'application_id' => $applicationId,
+    'status_url' => '/status/?id=' . rawurlencode($applicationId),
+    'confirmation_email_sent' => $confirmationSent,
+]);
+
+function rd_update_application_status(string $applicationId, string $status): void {
+    hd_json_mutate('driver-applications.json', function (array $store) use ($applicationId, $status): array {
+        if (isset($store['applications'][$applicationId]) && is_array($store['applications'][$applicationId])) {
+            $store['applications'][$applicationId]['status'] = $status;
+            $store['applications'][$applicationId]['updated_at'] = gmdate('c');
+        }
+        return $store;
+    });
+}
+
+function rd_smtp_send(array $cfg, string $to, string $subject, string $html, string $plain, string $replyTo): bool {
+    $host = (string) $cfg['host'];
     $port = (int) $cfg['port'];
-    $user = $cfg['username'];
-    $pass = $cfg['password'];
-    $from = $cfg['from_email'];
+    $user = (string) $cfg['username'];
+    $pass = (string) $cfg['password'];
+    $from = (string) $cfg['from_email'];
+    $fromName = str_replace(["\r", "\n"], '', (string) ($cfg['from_name'] ?? 'Higo Driver'));
+    $safeTo = str_replace(["\r", "\n", "\0"], '', $to);
+    $safeReplyTo = str_replace(["\r", "\n", "\0"], '', $replyTo);
+    $encodedSubject = '=?UTF-8?B?' . base64_encode($subject) . '?=';
+
+    $boundary = '=_alt_' . bin2hex(random_bytes(8));
+    $body = "--{$boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n{$plain}\r\n";
+    $body .= "--{$boundary}\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n{$html}\r\n--{$boundary}--\r\n";
 
     $url = ($port === 465 ? 'ssl://' : '') . $host;
-    // Verificación TLS activa: smtp.hostinger.com usa cert público válido.
-    // Sin esto, un MITM puede capturar el AUTH LOGIN (password del mailbox)
-    // y la PII de los aspirantes (auditoría 2026-06-04, hallazgo #2).
-    $ctx = stream_context_create(['ssl' => [
-        'verify_peer'      => true,
+    $context = stream_context_create(['ssl' => [
+        'verify_peer' => true,
         'verify_peer_name' => true,
-        'SNI_enabled'      => true,
-        'peer_name'        => $host,
+        'SNI_enabled' => true,
+        'peer_name' => $host,
     ]]);
-    $fp  = @stream_socket_client("$url:$port", $errno, $errstr, 15, STREAM_CLIENT_CONNECT, $ctx);
-    if (!$fp) {
-        error_log("rd_smtp_send: connect failed $host:$port — $errno $errstr");
+    $socket = @stream_socket_client($url . ':' . $port, $errno, $errstr, 15, STREAM_CLIENT_CONNECT, $context);
+    if (!$socket) {
+        error_log('rd_smtp_send connect failed: ' . $errno . ' ' . $errstr);
         return false;
     }
-    stream_set_timeout($fp, 30);
+    stream_set_timeout($socket, 30);
 
-    $read = function () use ($fp) {
-        $out = '';
-        while ($line = fgets($fp, 1024)) {
-            $out .= $line;
+    $read = function () use ($socket): string {
+        $output = '';
+        while (($line = fgets($socket, 1024)) !== false) {
+            $output .= $line;
             if (isset($line[3]) && $line[3] === ' ') break;
         }
-        return $out;
+        return $output;
     };
-    $write = function (string $cmd) use ($fp) { fwrite($fp, $cmd . "\r\n"); };
-    $expect = function (string $resp, string $code) {
-        if (strpos($resp, $code) !== 0) {
-            error_log('rd_smtp_send: expected ' . $code . ' got ' . trim($resp));
+    $write = function (string $command) use ($socket): void { fwrite($socket, $command . "\r\n"); };
+    $expect = function (string $response, string $code): bool {
+        if (strpos($response, $code) !== 0) {
+            error_log('rd_smtp_send expected ' . $code . ' got ' . trim($response));
             return false;
         }
         return true;
     };
 
-    if (!$expect($read(), '220')) { fclose($fp); return false; }
-
-    $write('EHLO ' . ($cfg['ehlo'] ?? 'higodriver.com'));
-    if (!$expect($read(), '250')) { fclose($fp); return false; }
-
-    // STARTTLS si estamos en 587
+    if (!$expect($read(), '220')) { fclose($socket); return false; }
+    $write('EHLO ' . (string) ($cfg['ehlo'] ?? 'higodriver.com'));
+    if (!$expect($read(), '250')) { fclose($socket); return false; }
     if ($port === 587) {
         $write('STARTTLS');
-        if (!$expect($read(), '220')) { fclose($fp); return false; }
-        if (!@stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
-            error_log('rd_smtp_send: STARTTLS handshake failed');
-            fclose($fp); return false;
-        }
-        $write('EHLO ' . ($cfg['ehlo'] ?? 'higodriver.com'));
-        if (!$expect($read(), '250')) { fclose($fp); return false; }
+        if (!$expect($read(), '220')) { fclose($socket); return false; }
+        if (!@stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) { fclose($socket); return false; }
+        $write('EHLO ' . (string) ($cfg['ehlo'] ?? 'higodriver.com'));
+        if (!$expect($read(), '250')) { fclose($socket); return false; }
     }
-
     $write('AUTH LOGIN');
-    if (!$expect($read(), '334')) { fclose($fp); return false; }
+    if (!$expect($read(), '334')) { fclose($socket); return false; }
     $write(base64_encode($user));
-    if (!$expect($read(), '334')) { fclose($fp); return false; }
+    if (!$expect($read(), '334')) { fclose($socket); return false; }
     $write(base64_encode($pass));
-    if (!$expect($read(), '235')) { fclose($fp); return false; }
-
-    $write("MAIL FROM:<{$from}>");
-    if (!$expect($read(), '250')) { fclose($fp); return false; }
-    $write("RCPT TO:<{$to}>");
-    if (!$expect($read(), '250')) { fclose($fp); return false; }
-
+    if (!$expect($read(), '235')) { fclose($socket); return false; }
+    $write('MAIL FROM:<' . $from . '>');
+    if (!$expect($read(), '250')) { fclose($socket); return false; }
+    $write('RCPT TO:<' . $safeTo . '>');
+    if (!$expect($read(), '250')) { fclose($socket); return false; }
     $write('DATA');
-    if (!$expect($read(), '354')) { fclose($fp); return false; }
+    if (!$expect($read(), '354')) { fclose($socket); return false; }
 
-    $msg  = "Subject: {$subject}\r\n";
-    $msg .= "To: {$to}\r\n";
-    $msg .= $headers;
-    $msg .= "\r\n";
-    $msg .= $body;
-    // RFC 5321: líneas que empiezan con '.' se doblan a '..' para no
-    // confundirlas con el terminador.
-    $msg = preg_replace('/(^|\r\n)\./', '$1..', $msg);
-
-    fwrite($fp, $msg);
-    fwrite($fp, "\r\n.\r\n");
-    if (!$expect($read(), '250')) { fclose($fp); return false; }
-
+    $message = 'Subject: ' . $encodedSubject . "\r\n";
+    $message .= 'To: ' . $safeTo . "\r\n";
+    $message .= 'From: ' . $fromName . ' <' . $from . ">\r\n";
+    $message .= 'Reply-To: ' . $safeReplyTo . "\r\n";
+    $message .= "MIME-Version: 1.0\r\n";
+    $message .= 'Content-Type: multipart/alternative; boundary="' . $boundary . "\"\r\n\r\n";
+    $message .= $body;
+    $message = preg_replace('/(^|\r\n)\./', '$1..', $message);
+    fwrite($socket, $message . "\r\n.\r\n");
+    if (!$expect($read(), '250')) { fclose($socket); return false; }
     $write('QUIT');
-    fclose($fp);
+    fclose($socket);
     return true;
 }
