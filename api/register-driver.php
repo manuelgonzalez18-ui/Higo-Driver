@@ -45,14 +45,30 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // en .gitignore). Debe definir un array con: host, port, username,
 // password, from_email, from_name (opcional), ehlo (opcional).
 // Si falta, fallamos rápido para no perder solicitudes silenciosamente.
-$smtpConfigPath = __DIR__ . '/_smtp_config.php';
-if (!is_file($smtpConfigPath)) {
-    error_log('register-driver: falta _smtp_config.php en ' . __DIR__);
+$smtpConfigCandidates = [
+    __DIR__ . '/_smtp_config.php',
+    dirname(__DIR__, 2) . '/Private/smtp-config.php',
+    dirname(__DIR__, 3) . '/Private/smtp-config.php',
+    dirname(__DIR__, 2) . '/private/smtp-config.php',
+    dirname(__DIR__, 3) . '/private/smtp-config.php',
+];
+
+$smtpConfigPath = null;
+foreach ($smtpConfigCandidates as $candidate) {
+    if (is_file($candidate)) {
+        $smtpConfigPath = $candidate;
+        break;
+    }
+}
+
+if ($smtpConfigPath === null) {
+    error_log('register-driver: no se encontr? una configuraci?n SMTP privada');
     rd_send(503, ['ok' => false, 'error' => 'mail_config_missing']);
 }
+
 $smtpCfg = require $smtpConfigPath;
 if (!is_array($smtpCfg) || empty($smtpCfg['host']) || empty($smtpCfg['username']) || empty($smtpCfg['password'])) {
-    error_log('register-driver: _smtp_config.php inválido');
+    error_log('register-driver: configuraci?n SMTP inv?lida');
     rd_send(503, ['ok' => false, 'error' => 'mail_config_invalid']);
 }
 
