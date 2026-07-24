@@ -199,7 +199,7 @@
                     }
                     var applicationId = result.body.application_id;
                     var statusUrl = result.body.status_url || ('/status/?id=' + encodeURIComponent(applicationId));
-                    localStorage.setItem('higo_driver_application', JSON.stringify({ id: applicationId, email: form.elements.email.value, created_at: new Date().toISOString() }));
+                    localStorage.setItem('higo_driver_application', JSON.stringify({ id: applicationId, created_at: new Date().toISOString() }));
                     track('application_submitted', { vehicle_type: form.elements.vehicle_type.value, city: form.elements.city.value.slice(0, 40) });
                     setFormStatus('ok', '<strong>¡Pre-registro recibido!</strong><br>Guarda este código:<br><span class="application-code">' + escapeHtml(applicationId) + '</span><br><a href="' + escapeHtml(statusUrl) + '">Consultar estado de la solicitud →</a>');
                     form.reset();
@@ -220,10 +220,7 @@
         if (id) form.elements.application_id.value = id.toUpperCase();
         try {
             var saved = JSON.parse(localStorage.getItem('higo_driver_application') || 'null');
-            if (saved) {
-                if (!form.elements.application_id.value) form.elements.application_id.value = saved.id || '';
-                form.elements.email.value = saved.email || '';
-            }
+            if (saved && !form.elements.application_id.value) form.elements.application_id.value = saved.id || '';
         } catch (error) {}
 
         form.addEventListener('submit', function (event) {
