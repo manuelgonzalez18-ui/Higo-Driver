@@ -1,0 +1,3 @@
+Production deployment trigger for the current secure Higo Driver landing.
+Date: 2026-07-25
+Expected homepage title: Conduce con Higo · Registro de conductores
