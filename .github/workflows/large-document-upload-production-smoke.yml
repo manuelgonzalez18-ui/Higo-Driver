@@ -1,0 +1,42 @@
+name: Large Document Upload Production Smoke
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/large-document-upload-production-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  large-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify realistic mobile upload reaches application validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          work=/tmp/higo-large-upload
+          mkdir -p "$work"
+          printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' | base64 -d > "$work/template.png"
+          for name in profile identity license registration rcv vehicle; do
+            cp "$work/template.png" "$work/$name.png"
+            head -c $((4 * 1024 * 1024 - 68)) /dev/zero >> "$work/$name.png"
+          done
+          token='AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+          status=$(curl --silent --show-error --max-time 240 \
+            --output "$work/response.json" --write-out '%{http_code}' \
+            --request POST 'https://higodriver.com/api/upload-documents.php' \
+            --form-string "token=$token" \
+            --form "profile_photo=@$work/profile.png;type=image/png" \
+            --form "identity=@$work/identity.png;type=image/png" \
+            --form "driver_license=@$work/license.png;type=image/png" \
+            --form "vehicle_registration=@$work/registration.png;type=image/png" \
+            --form "rcv=@$work/rcv.png;type=image/png" \
+            --form "vehicle_photo=@$work/vehicle.png;type=image/png" \
+            --write-out '%{http_code}' || true)
+          echo "HTTP $status"
+          cat "$work/response.json" || true
+          test "$status" = '401'
+          grep -q 'invalid_or_expired_token' "$work/response.json"
