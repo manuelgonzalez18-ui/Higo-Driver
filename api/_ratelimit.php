@@ -30,6 +30,13 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === basename(__FILE__)) {
  * @param string|null $logFile path donde appendear los 429s para auditar
  */
 function api_rate_limit(string $bucket, int $maxPerMin, ?string $logFile = null): void {
+    // El formulario público de registro requiere margen adicional durante
+    // pruebas, correcciones y redes compartidas. Mantiene protección anti-spam
+    // pero permite hasta 10 intentos por minuto por IP.
+    if ($bucket === 'register-driver') {
+        $maxPerMin = max($maxPerMin, 10);
+    }
+
     $ip  = (string) ($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
     // Si está detrás de un proxy/Cloudflare, preferimos el header real.
     if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
