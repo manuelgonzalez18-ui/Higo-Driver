@@ -34,8 +34,7 @@ jobs:
             --form "driver_license=@$work/license.png;type=image/png" \
             --form "vehicle_registration=@$work/registration.png;type=image/png" \
             --form "rcv=@$work/rcv.png;type=image/png" \
-            --form "vehicle_photo=@$work/vehicle.png;type=image/png" \
-            --write-out '%{http_code}' || true)
+            --form "vehicle_photo=@$work/vehicle.png;type=image/png" || true)
           echo "HTTP $status"
           cat "$work/response.json" || true
           test "$status" = '401'
