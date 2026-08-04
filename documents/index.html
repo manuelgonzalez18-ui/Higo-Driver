@@ -7,8 +7,8 @@
     <meta name="robots" content="noindex,nofollow,noarchive">
     <meta name="theme-color" content="#07132f">
     <link rel="icon" type="image/svg+xml" href="/assets/logo.svg?v=20260724b">
-    <link rel="stylesheet" href="/assets/documents.css?v=20260724d">
-    <script src="/assets/documents.js?v=20260724d" defer></script>
+    <link rel="stylesheet" href="/assets/documents.css?v=20260804a">
+    <script src="/assets/documents.js?v=20260804a" defer></script>
 </head>
 <body>
     <header class="header">
@@ -40,6 +40,10 @@
 
             <form id="documentsForm" enctype="multipart/form-data" novalidate>
                 <div class="grid">
+                    <label class="upload-field">
+                        <span><strong>Foto de perfil del conductor</strong><small>Fotografía frontal, reciente, sin casco ni lentes oscuros y con el rostro claramente visible.</small></span>
+                        <input type="file" name="profile_photo" accept="image/jpeg,image/png,image/webp" required>
+                    </label>
                     <label class="upload-field">
                         <span><strong>Cédula de identidad</strong><small>Documento vigente y legible.</small></span>
                         <input type="file" name="identity" accept="image/jpeg,image/png,image/webp,application/pdf" required>

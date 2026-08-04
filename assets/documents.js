@@ -1,6 +1,29 @@
 (function () {
     'use strict';
 
+    var REQUIRED_FIELDS = [
+        'profile_photo',
+        'identity',
+        'driver_license',
+        'vehicle_registration',
+        'rcv',
+        'vehicle_photo'
+    ];
+    var MAX_FILE_SIZE = 8 * 1024 * 1024;
+    var MAX_TOTAL_SIZE = 30 * 1024 * 1024;
+
+    var labels = {
+        profile_photo: 'foto de perfil del conductor',
+        identity: 'cédula de identidad',
+        driver_license: 'licencia de conducir',
+        vehicle_registration: 'certificado de circulación',
+        rcv: 'RCV vigente',
+        vehicle_photo: 'fotografía del vehículo',
+        health_certificate: 'certificado de salud',
+        payment_details: 'datos para cobro directo',
+        other: 'otro requisito'
+    };
+
     function safeJson(response) {
         return response.text().then(function (text) {
             if (!text) return {};
@@ -17,31 +40,32 @@
     }
 
     function formatError(code, detail) {
-        var labels = {
-            identity: 'cédula de identidad',
-            driver_license: 'licencia de conducir',
-            vehicle_registration: 'certificado de circulación',
-            rcv: 'RCV vigente',
-            vehicle_photo: 'fotografía del vehículo'
-        };
         var messages = {
             invalid_or_expired_token: 'Este enlace no es válido, está siendo utilizado o ya venció. Solicita uno nuevo al equipo Higo.',
             documents_not_expected: 'La solicitud no está habilitada actualmente para recibir documentos.',
-            no_documents: 'Selecciona los documentos requeridos antes de continuar.',
+            no_documents: 'El servidor no recibió los archivos seleccionados. Recarga la página, vuelve a seleccionarlos e intenta nuevamente.',
             missing_required_document: 'Falta un documento obligatorio: ' + (labels[detail] || detail || 'requisito sin identificar') + '.',
-            invalid_file_size: 'Uno de los archivos supera el máximo permitido de 8 MB.',
+            invalid_file_size: 'El archivo de ' + (labels[detail] || detail || 'uno de los requisitos') + ' supera el máximo permitido de 8 MB o está vacío.',
             total_upload_too_large: 'El conjunto de archivos supera el máximo permitido de 30 MB.',
-            invalid_file_type: 'Uno de los archivos no tiene un formato permitido.',
+            request_too_large: 'La carga supera el límite permitido por el servidor. Reduce el tamaño de las imágenes o archivos e intenta nuevamente.',
+            invalid_file_type: 'El archivo de ' + (labels[detail] || detail || 'uno de los requisitos') + ' no tiene un formato permitido.',
+            upload_failed: 'No se pudo leer el archivo de ' + (labels[detail] || detail || 'uno de los requisitos') + '. Vuelve a seleccionarlo.',
             document_upload_not_completed: 'La carga no pudo finalizar de forma segura. Ningún envío incompleto será procesado; intenta nuevamente.',
             upstream_unavailable: 'El servicio de verificación está temporalmente no disponible.',
-            rate_limited: 'Has realizado varios intentos. Espera un minuto antes de volver a enviar.'
+            rate_limited: 'Has realizado varios intentos. Espera un minuto antes de volver a enviar.',
+            invalid_response: 'El servidor no pudo procesar la carga. Recarga la página e intenta nuevamente.'
         };
         return messages[code] || ('No pudimos completar el envío.' + (detail ? ' Archivo: ' + detail : ''));
+    }
+
+    function selectedFile(input) {
+        return input && input.files && input.files.length ? input.files[0] : null;
     }
 
     document.addEventListener('DOMContentLoaded', function () {
         var form = document.getElementById('documentsForm');
         var button = document.getElementById('submitDocuments');
+        var confirmAccuracy = document.getElementById('confirmAccuracy');
         if (!form || !button) return;
 
         var token = new URLSearchParams(window.location.search).get('token') || '';
@@ -53,19 +77,51 @@
 
         form.querySelectorAll('input[type="file"]').forEach(function (input) {
             input.addEventListener('change', function () {
-                var file = input.files && input.files[0];
+                var file = selectedFile(input);
                 if (!file) return;
-                if (file.size > 8 * 1024 * 1024) {
+                if (file.size <= 0 || file.size > MAX_FILE_SIZE) {
+                    var fileName = String(file.name || '').replace(/[&<>"']/g, '');
                     input.value = '';
-                    showMessage('error', 'El archivo <strong>' + file.name.replace(/[&<>"']/g, '') + '</strong> supera 8 MB.');
+                    showMessage('error', 'El archivo <strong>' + fileName + '</strong> está vacío o supera 8 MB.');
                 }
             });
         });
 
         form.addEventListener('submit', function (event) {
             event.preventDefault();
-            if (!form.checkValidity()) {
-                form.reportValidity();
+
+            var missing = REQUIRED_FIELDS.filter(function (field) {
+                return !selectedFile(form.elements[field]);
+            });
+            if (missing.length) {
+                showMessage('error', '<strong>Faltan documentos obligatorios.</strong><br>Selecciona: ' + missing.map(function (field) {
+                    return labels[field];
+                }).join(', ') + '.');
+                var firstMissing = form.elements[missing[0]];
+                if (firstMissing && typeof firstMissing.focus === 'function') firstMissing.focus();
+                return;
+            }
+
+            if (!confirmAccuracy || !confirmAccuracy.checked) {
+                showMessage('error', '<strong>Falta la confirmación.</strong><br>Marca la casilla de autenticidad antes de enviar.');
+                if (confirmAccuracy) confirmAccuracy.focus();
+                return;
+            }
+
+            var totalSize = 0;
+            var invalidFile = null;
+            form.querySelectorAll('input[type="file"]').forEach(function (input) {
+                var file = selectedFile(input);
+                if (!file) return;
+                totalSize += file.size;
+                if (!invalidFile && (file.size <= 0 || file.size > MAX_FILE_SIZE)) invalidFile = input.name;
+            });
+            if (invalidFile) {
+                showMessage('error', '<strong>Archivo no válido.</strong><br>' + formatError('invalid_file_size', invalidFile));
+                return;
+            }
+            if (totalSize > MAX_TOTAL_SIZE) {
+                showMessage('error', '<strong>La carga es demasiado grande.</strong><br>' + formatError('total_upload_too_large'));
                 return;
             }
 
@@ -78,10 +134,12 @@
 
             fetch('/api/upload-documents.php', {
                 method: 'POST',
-                body: data
+                body: data,
+                credentials: 'same-origin'
             })
                 .then(function (response) {
                     return safeJson(response).then(function (body) {
+                        if (response.status === 413 && !body.error) body.error = 'request_too_large';
                         return { response: response, body: body };
                     });
                 })
