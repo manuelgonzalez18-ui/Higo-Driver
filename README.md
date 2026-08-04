@@ -108,6 +108,22 @@ Proceso recomendado:
 4. Fusionar a `main`.
 5. Verificar el webhook y hacer prueba de humo en producción.
 
+### Prueba de humo del backend moderno
+
+Después de desplegar, una solicitud vacía debe fallar por validación de campos antes de intentar usar SMTP:
+
+```bash
+curl -sS -X POST https://higodriver.com/api/register-driver.php
+```
+
+La respuesta esperada empieza con:
+
+```json
+{"ok":false,"error":"missing_field"}
+```
+
+Si responde `mail_config_missing`, revisa que `/Private/smtp-config.php` sea legible y confirma que Hostinger desplegó la versión actual de `api/register-driver.php`, no el backend antiguo que esperaba documentos adjuntos.
+
 ## Validación local
 
 ```bash
