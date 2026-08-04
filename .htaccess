@@ -24,7 +24,7 @@ DirectoryIndex index.html
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
     Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
     Header always set Cross-Origin-Opener-Policy "same-origin"
-    Header always set Content-Security-Policy "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; upgrade-insecure-requests"
+    Header always set Content-Security-Policy "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://higoapp.com https://www.higoapp.com; upgrade-insecure-requests"
 
     <FilesMatch "\.(?:css|js|svg|jpg|jpeg|png|webp)$">
         Header set Cache-Control "public, max-age=604800, stale-while-revalidate=86400"
@@ -34,6 +34,7 @@ DirectoryIndex index.html
     </FilesMatch>
 </IfModule>
 
-# El formulario admite hasta 30 MB entre todos los documentos. Se deja margen
-# para los límites y encabezados del multipart/form-data.
+# Compatibilidad para formularios antiguos y archivos individuales. El flujo
+# moderno envía JSON directamente a higoapp.com y ya no depende de multipart
+# para cargas grandes desde el navegador.
 LimitRequestBody 41943040

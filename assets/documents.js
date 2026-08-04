@@ -1,6 +1,7 @@
 (function () {
     'use strict';
 
+    var UPLOAD_ENDPOINT = 'https://higoapp.com/api/driver-application-documents.php';
     var REQUIRED_FIELDS = [
         'profile_photo',
         'identity',
@@ -60,6 +61,49 @@
 
     function selectedFile(input) {
         return input && input.files && input.files.length ? input.files[0] : null;
+    }
+
+    function fileToPayload(file) {
+        return new Promise(function (resolve, reject) {
+            var reader = new FileReader();
+            reader.onerror = function () {
+                reject(new Error('No se pudo leer el archivo ' + String(file.name || '') + '.'));
+            };
+            reader.onload = function () {
+                var result = String(reader.result || '');
+                var separator = result.indexOf(',');
+                if (separator < 0) {
+                    reject(new Error('No se pudo preparar el archivo ' + String(file.name || '') + '.'));
+                    return;
+                }
+                resolve({
+                    name: String(file.name || 'documento').slice(0, 180),
+                    mime: String(file.type || 'application/octet-stream'),
+                    size: file.size,
+                    data_base64: result.slice(separator + 1)
+                });
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function prepareFiles(form, button) {
+        var inputs = Array.prototype.slice.call(form.querySelectorAll('input[type="file"]'));
+        var files = {};
+        var sequence = Promise.resolve();
+
+        inputs.forEach(function (input) {
+            var file = selectedFile(input);
+            if (!file) return;
+            sequence = sequence.then(function () {
+                button.textContent = 'Preparando ' + (labels[input.name] || 'documento') + '…';
+                return fileToPayload(file).then(function (payload) {
+                    files[input.name] = payload;
+                });
+            });
+        });
+
+        return sequence.then(function () { return files; });
     }
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -125,18 +169,27 @@
                 return;
             }
 
-            var data = new FormData(form);
-            data.append('token', token);
             var original = button.textContent;
             button.disabled = true;
-            button.textContent = 'Cargando y protegiendo documentos…';
-            showMessage('success', 'La carga puede tardar algunos segundos. No cierres esta ventana.');
+            button.textContent = 'Preparando documentos…';
+            showMessage('success', 'Estamos preparando y enviando los documentos de forma segura. No cierres esta ventana.');
 
-            fetch('/api/upload-documents.php', {
-                method: 'POST',
-                body: data,
-                credentials: 'same-origin'
-            })
+            prepareFiles(form, button)
+                .then(function (files) {
+                    button.textContent = 'Enviando documentos para revisión…';
+                    return fetch(UPLOAD_ENDPOINT, {
+                        method: 'POST',
+                        mode: 'cors',
+                        credentials: 'omit',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            token: token,
+                            files: files
+                        })
+                    });
+                })
                 .then(function (response) {
                     return safeJson(response).then(function (body) {
                         if (response.status === 413 && !body.error) body.error = 'request_too_large';
@@ -153,7 +206,11 @@
                     showMessage('success', '<strong>Documentos recibidos correctamente.</strong><br>El equipo Higo los revisará y te notificará por correo.<br><br><a href="' + statusUrl + '">Consultar el estado de la solicitud →</a>');
                 })
                 .catch(function (error) {
-                    showMessage('error', '<strong>No se pudo completar el envío.</strong><br>' + String(error.message || 'Intenta nuevamente.'));
+                    var rawMessage = String(error && error.message ? error.message : '');
+                    var message = /failed to fetch|networkerror|load failed/i.test(rawMessage)
+                        ? 'No fue posible conectar con el servidor. Verifica tu conexión a internet, mantén esta página abierta y vuelve a intentarlo. Los documentos no se marcaron como enviados.'
+                        : (rawMessage || 'Intenta nuevamente.');
+                    showMessage('error', '<strong>No se pudo completar el envío.</strong><br>' + message);
                     button.disabled = false;
                     button.textContent = original;
                 });
