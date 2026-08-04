@@ -1,0 +1,53 @@
+name: Document Upload Production Smoke
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/document-upload-production-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  multipart-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify multipart parsing on both production hops
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/higo-upload-smoke
+          # Valid 1x1 PNG. The token is intentionally fake; a correctly parsed
+          # multipart request must reach token validation and return 401
+          # invalid_or_expired_token instead of 422 no_documents.
+          printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' | base64 -d > /tmp/higo-upload-smoke/test.png
+          token='AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+
+          check_endpoint() {
+            local name="$1"
+            local url="$2"
+            local body="/tmp/higo-upload-smoke/${name}.json"
+            local status
+            status=$(curl --fail-with-body --silent --show-error \
+              --output "$body" --write-out '%{http_code}' \
+              --request POST "$url" \
+              --form-string "token=$token" \
+              --form 'profile_photo=@/tmp/higo-upload-smoke/test.png;type=image/png' \
+              --form 'identity=@/tmp/higo-upload-smoke/test.png;type=image/png' \
+              --form 'driver_license=@/tmp/higo-upload-smoke/test.png;type=image/png' \
+              --form 'vehicle_registration=@/tmp/higo-upload-smoke/test.png;type=image/png' \
+              --form 'rcv=@/tmp/higo-upload-smoke/test.png;type=image/png' \
+              --form 'vehicle_photo=@/tmp/higo-upload-smoke/test.png;type=image/png' \
+              || true)
+            echo "[$name] HTTP $status"
+            cat "$body" || true
+            echo
+            grep -q 'invalid_or_expired_token' "$body" || {
+              echo "Multipart parsing failed at $name" >&2
+              exit 1
+            }
+          }
+
+          check_endpoint higo-app https://higoapp.com/api/driver-application-documents.php
+          check_endpoint higo-driver https://higodriver.com/api/upload-documents.php
