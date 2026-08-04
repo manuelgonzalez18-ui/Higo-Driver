@@ -24,7 +24,6 @@ $contentLength = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
 if ($contentLength > 41943040) {
     ud_send(413, ['ok' => false, 'error' => 'request_too_large']);
 }
-// PHP vacía $_POST y $_FILES cuando el multipart supera post_max_size.
 if ($contentLength > 0 && empty($_POST) && empty($_FILES)) {
     ud_send(413, ['ok' => false, 'error' => 'request_too_large']);
 }
@@ -63,10 +62,10 @@ $fields = [
 ];
 $requiredFields = ['profile_photo','identity','driver_license','vehicle_registration','rcv','vehicle_photo'];
 $allowedMime = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-$postFields = ['token' => $token];
 $totalSize = 0;
 $fileCount = 0;
 $presentFields = [];
+$filesPayload = [];
 $finfo = new finfo(FILEINFO_MIME_TYPE);
 
 foreach ($fields as $field) {
@@ -92,7 +91,18 @@ foreach ($fields as $field) {
     if ($totalSize > 31457280) {
         ud_send(413, ['ok' => false, 'error' => 'total_upload_too_large']);
     }
-    $postFields[$field] = new CURLFile($tmp, $mime, substr(basename((string) ($file['name'] ?? $field)), 0, 180));
+
+    $binary = file_get_contents($tmp);
+    if (!is_string($binary) || $binary === '') {
+        ud_send(422, ['ok' => false, 'error' => 'upload_failed', 'detail' => $field]);
+    }
+
+    $filesPayload[$field] = [
+        'name' => substr(basename((string) ($file['name'] ?? $field)), 0, 180),
+        'mime' => $mime,
+        'size' => $size,
+        'data_base64' => base64_encode($binary),
+    ];
     $presentFields[$field] = true;
     $fileCount++;
 }
@@ -104,18 +114,33 @@ foreach ($requiredFields as $requiredField) {
     }
 }
 
+$payload = json_encode([
+    'token' => $token,
+    'files' => $filesPayload,
+], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+if (!is_string($payload)) {
+    ud_send(500, ['ok' => false, 'error' => 'payload_encoding_failed']);
+}
+if (strlen($payload) > 52428800) {
+    ud_send(413, ['ok' => false, 'error' => 'request_too_large']);
+}
+
 $ch = curl_init($baseUrl . '/api/driver-application-documents.php');
 curl_setopt_array($ch, [
     CURLOPT_POST => true,
     CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_TIMEOUT => 120,
+    CURLOPT_TIMEOUT => 180,
     CURLOPT_CONNECTTIMEOUT => 15,
     CURLOPT_SSL_VERIFYPEER => true,
     CURLOPT_SSL_VERIFYHOST => 2,
-    CURLOPT_POSTFIELDS => $postFields,
-    CURLOPT_SAFE_UPLOAD => true,
+    CURLOPT_POSTFIELDS => $payload,
     CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-    CURLOPT_HTTPHEADER => ['Accept: application/json', 'Expect:'],
+    CURLOPT_HTTPHEADER => [
+        'Accept: application/json',
+        'Content-Type: application/json',
+        'Content-Length: ' . strlen($payload),
+        'Expect:',
+    ],
 ]);
 $response = curl_exec($ch);
 $error = curl_error($ch);
