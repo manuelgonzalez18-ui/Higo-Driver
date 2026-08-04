@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Verify realistic mobile upload reaches application validation
+      - name: Compare multipart proxy and direct JSON transport
         shell: bash
         run: |
           set -euo pipefail
@@ -25,8 +25,9 @@ jobs:
             head -c $((4 * 1024 * 1024 - 68)) /dev/zero >> "$work/$name.png"
           done
           token='AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
-          status=$(curl --silent --show-error --max-time 240 \
-            --output "$work/response.json" --write-out '%{http_code}' \
+
+          proxy_status=$(curl --silent --show-error --max-time 240 \
+            --output "$work/proxy-response.json" --write-out '%{http_code}' \
             --request POST 'https://higodriver.com/api/upload-documents.php' \
             --form-string "token=$token" \
             --form "profile_photo=@$work/profile.png;type=image/png" \
@@ -35,7 +36,44 @@ jobs:
             --form "vehicle_registration=@$work/registration.png;type=image/png" \
             --form "rcv=@$work/rcv.png;type=image/png" \
             --form "vehicle_photo=@$work/vehicle.png;type=image/png" || true)
-          echo "HTTP $status"
-          cat "$work/response.json" || true
-          test "$status" = '401'
-          grep -q 'invalid_or_expired_token' "$work/response.json"
+          echo "Higo Driver multipart: HTTP $proxy_status"
+          cat "$work/proxy-response.json" || true
+          echo
+
+          python3 - <<'PY'
+          import base64, json, pathlib
+          work = pathlib.Path('/tmp/higo-large-upload')
+          mapping = {
+              'profile_photo': 'profile.png',
+              'identity': 'identity.png',
+              'driver_license': 'license.png',
+              'vehicle_registration': 'registration.png',
+              'rcv': 'rcv.png',
+              'vehicle_photo': 'vehicle.png',
+          }
+          files = {}
+          for field, filename in mapping.items():
+              raw = (work / filename).read_bytes()
+              files[field] = {
+                  'name': filename,
+                  'mime': 'image/png',
+                  'size': len(raw),
+                  'data_base64': base64.b64encode(raw).decode('ascii'),
+              }
+          (work / 'payload.json').write_text(json.dumps({
+              'token': 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+              'files': files,
+          }), encoding='utf-8')
+          PY
+
+          direct_status=$(curl --silent --show-error --max-time 240 \
+            --output "$work/direct-response.json" --write-out '%{http_code}' \
+            --request POST 'https://higoapp.com/api/driver-application-documents.php' \
+            --header 'Content-Type: application/json' \
+            --data-binary "@$work/payload.json" || true)
+          echo "Higo App direct JSON: HTTP $direct_status"
+          cat "$work/direct-response.json" || true
+          echo
+
+          test "$direct_status" = '401'
+          grep -q 'invalid_or_expired_token' "$work/direct-response.json"
